@@ -1,0 +1,15 @@
+version: "3"
+
+services:
+    telegram-bot:
+      build:
+        context: telegram-bot-docker
+        dockerfile: Dockerfile
+      container_name: telegram-bot
+      volumes:
+        - app/bot.py:/app/bot.py:ro
+        - app/config.py:/app/config.py:ro
+        - app/utils:/app/utils:ro
+        - /var/run/docker.sock:/var/run/docker.sock
+      restart: unless-stopped 
+
