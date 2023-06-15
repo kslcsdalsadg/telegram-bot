@@ -440,6 +440,7 @@ async def handle_invalid_button(update, context):
     sleep(10)
     await message.delete()
     await update.callback_query.message.delete()
+    await list_commands(update, context)
 
 ##### Main
 
