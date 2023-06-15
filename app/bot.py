@@ -33,6 +33,8 @@ DOCKER_ACTIONS = {
     'delete': {'title': 'Eliminar el contenedor', 'action': 'eliminarlo'},
 }
 
+BOT_MESSAGES = {}
+
 logger = logging.getLogger(__name__)
              
 ##### Funciones auxiliares para Telegram
@@ -119,6 +121,24 @@ async def greet_chat_members(update, context):
             await update.effective_chat.send_message("\n\n".join(text), parse_mode = ParseMode.HTML, disable_notification = True)
     
 ##### Gestión de menús de Telegram
+
+MESSAGES = {}
+
+def _on_message_added(message):
+    chat_id, message_id = message.chat.id, message.id
+    MESSAGES[chat_id][message_id] = True
+    
+
+def _on_message_removed(message):
+    chat_id, message_id = message.chat.id, message.id
+    if chat_id in MESSAGES and message_id in MESSAGES[chat_id]: 
+        MESSAGES[chat_id].pop(message_id)
+    
+async def _on_bot_stop(application):
+    for chat_id in MESSAGES:
+        for message_id in MESSAGES[chat_id]:
+            await application.bot.delete_message(chat_id, message_id)
+            MESSAGES[chat_id].pop(message_id)           
 
 def _get_go_previous_menu_button_and_reference_text(current_menu, data):
     action, action_text, text = 'exit', '< Salir', 'pulsa el botón "&lt; Salir" para continuar.'
@@ -235,7 +255,10 @@ async def _menu(update, context, data):
         await update.callback_query.answer()
         await update.callback_query.message.edit_text("\n".join(text), parse_mode = ParseMode.HTML, reply_markup = InlineKeyboardMarkup(menu))
     else:
-        await update.effective_chat.send_message("\n".join(text), parse_mode = ParseMode.HTML, reply_markup = InlineKeyboardMarkup(menu), disable_notification = True)
+        message = await update.effective_chat.send_message("\n".join(text), parse_mode = ParseMode.HTML, reply_markup = InlineKeyboardMarkup(menu), disable_notification = True)
+        if not message.chat.id in BOT_MESSAGES:
+            BOT_MESSAGES[message.chat.id] = {}
+        BOT_MESSAGES[message.chat.id][message.id] = True 
     
 ##### Puntos de entrada de los diferentes menús
 
@@ -395,7 +418,10 @@ def is_interact_with_a_docker_request(data):
 
 async def exit_menu(update, context):
     await update.callback_query.answer()
-    await update.callback_query.message.delete()
+    message = update.callback_query.message
+    await message.delete()
+    if message.chat.id in BOT_MESSAGES and message.id in BOT_MESSAGES[message.chat.id]:
+        BOT_MESSAGES[message.chat.id].pop(message.id)
 
 def is_exit_menu_request(data):
     return isinstance(data, dict) and 'action' in data and data['action'] == 'exit';
@@ -417,14 +443,20 @@ async def handle_invalid_button(update, context):
 ##### Main
 
 async def post_init(application):
+    BOT_MESSAGES.clear()
     await application.bot.set_my_commands([ BotCommand('alarm', 'para visualizar las opciones de la alarma.'), BotCommand('cameras', 'para visualizar las opciones de gestión de cámaras.'), BotCommand('commands', 'para visualizar la lista de comandos disponibles.'), BotCommand('dockers', 'para visualizar las opciones de gestión de contenedores.'), BotCommand('menu', 'para visualizar el menú del bot.') ])
 
+async def post_stop(application): 
+    for chat_id in BOT_MESSAGES:
+        for message_id in BOT_MESSAGES[chat_id]:
+            await application.bot.delete_message(chat_id, message_id)
+    
 if __name__ == '__main__':
     logging.basicConfig(level = config.LOG_LEVEL)
     MqttAgent.initialize()
     AlarmoUtils.initialize()
     DockerUtils.initialize()
-    application = Application.builder().token(config.TELEGRAM['bot-token']).arbitrary_callback_data(True).post_init(post_init).build()
+    application = Application.builder().token(config.TELEGRAM['bot-token']).arbitrary_callback_data(True).post_init(post_init).post_stop(_on_bot_stop).post_stop(post_stop).build()
     application.add_error_handler(error_handler)
     application.add_handler(ChatMemberHandler(greet_chat_members, ChatMemberHandler.CHAT_MEMBER))
     application.add_handler(CommandHandler([ 'menu', 'start' ], menu))
