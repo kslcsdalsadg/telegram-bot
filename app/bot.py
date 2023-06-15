@@ -372,26 +372,27 @@ async def handle_camera_command(update, context):
 
 async def interact_with_a_docker(update, context):
     data = update.callback_query.data
-    if await is_user_administrator_on_any_allowed_group(get_effective_user(update), get_effective_chat(update)):
-        if data['command'] in DOCKER_ACTIONS:
-            message = await update.effective_chat.send_message('Espera mientras tratamos de acceder al contenedor para {}.'.format(DOCKER_ACTIONS[data['command']]['action']), disable_notification = True)
-            if data['command'] == 'delete':
-                DockerUtils.delete_container(data['docker-id'])
-                if not DockerUtils.container_exists(data['docker-id']):
-                    data['action'] = 'dockers-menu'
-                    await _menu(update, context, data)
-            else:
-                is_running = DockerUtils.is_container_running(data['docker-id'])
-                if data['command'] == 'start':
-                    DockerUtils.start_container(data['docker-id'])
-                elif data['command'] == 'stop':
-                    DockerUtils.stop_container(data['docker-id'])
-                elif data['command'] == 'restart':
-                    DockerUtils.restart_container(data['docker-id'])
-                if DockerUtils.is_container_running(data['docker-id']) != is_running:
-                    data['action'] = 'docker-menu'
-                    await _menu(update, context, data)
-            await message.delete()
+    if 'command' in data and 'docker-id' in data:
+        if await is_user_administrator_on_any_allowed_group(get_effective_user(update), get_effective_chat(update)):
+            if data['command'] in DOCKER_ACTIONS:
+                message = await update.effective_chat.send_message('Espera mientras tratamos de acceder al contenedor para {}.'.format(DOCKER_ACTIONS[data['command']]['action']), disable_notification = True)
+                if data['command'] == 'delete':
+                    DockerUtils.delete_container(data['docker-id'])
+                    if not DockerUtils.container_exists(data['docker-id']):
+                        data['action'] = 'dockers-menu'
+                        await _menu(update, context, data)
+                else:
+                    is_running = DockerUtils.is_container_running(data['docker-id'])
+                    if data['command'] == 'start':
+                        DockerUtils.start_container(data['docker-id'])
+                    elif data['command'] == 'stop':
+                        DockerUtils.stop_container(data['docker-id'])
+                    elif data['command'] == 'restart':
+                        DockerUtils.restart_container(data['docker-id'])
+                    if DockerUtils.is_container_running(data['docker-id']) != is_running:
+                        data['action'] = 'docker-menu'
+                        await _menu(update, context, data)
+                await message.delete()
 
 def is_interact_with_a_docker_request(data):
     return isinstance(data, dict) and 'action' in data and data['action'] == 'interact-with-a-docker';
@@ -422,7 +423,6 @@ async def handle_invalid_button(update, context):
     sleep(10)
     await message.delete()
     await update.callback_query.message.delete()
-    await list_commands(update, context)
 
 ##### Main
 
