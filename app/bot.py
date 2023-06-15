@@ -120,7 +120,7 @@ async def greet_chat_members(update, context):
     
 ##### Gestión de menús de Telegram
 
-def _get_go_previous_menu_button_and_reference_text(current_menu, data):
+def _get_go_previous_menu_button_and_text_suggestion(current_menu, data):
     action, action_text, text = 'exit', '< Salir', 'pulsa el botón "&lt; Salir" para continuar.'
     root_menu = data['root-menu'] if (data is not None) and ('root-menu' in data) else 'main-menu'
     if current_menu != root_menu:
@@ -132,12 +132,12 @@ def _get_go_previous_menu_button_and_reference_text(current_menu, data):
     return InlineKeyboardButton(action_text, callback_data = get_callback_data(action, current_callback_data = data)), text
 
 async def get_main_menu(user, chat, data):
-    exit_button, exit_text_suggestion = _get_go_previous_menu_button_and_reference_text('main-menu', data)
+    exit_button, exit_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('main-menu', data)
     menu, text = [], []
     if AlarmoUtils.can_change_state():
         menu.append([ InlineKeyboardButton('Gestionar la alarma', callback_data = get_callback_data('alarm-menu', current_callback_data = data)) ])
     if await is_user_administrator_on_any_allowed_group(user, chat):
-        if config.CAMERAS['devices'] is not None:
+        if 'devices' in config.CAMERAS:
             menu.append([ InlineKeyboardButton('Gestionar las cámaras', callback_data = get_callback_data('cameras-menu', current_callback_data = data)) ])
         menu.append([ InlineKeyboardButton('Gestionar los contenedores', callback_data = get_callback_data('dockers-menu', current_callback_data = data)) ])
     text = [ 'Selecciona una opción para continuar o {}'.format(exit_text_suggestion) ] if len(menu) > 0 else [ 'Ahora mismo no hay opciones disponibles.', '', exit_text_suggestion.capitalize() ]
@@ -148,7 +148,7 @@ def _get_alarm_mode_name(arm_mode):
     return config.ALARMO['arm-modes-names'][arm_mode] if ('arm-modes-names' in config.ALARMO) and (arm_mode in config.ALARMO['arm-modes-names']) else ALARMO_ACTIONS[arm_mode]['name']
 
 async def get_alarm_menu(user, chat, data):
-    back_button, back_text_suggestion = _get_go_previous_menu_button_and_reference_text('alarm-menu', data)
+    back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('alarm-menu', data)
     menu, text = [], []
     if AlarmoUtils.can_change_state():
         if AlarmoUtils.get_state() == 'disarmed':
@@ -162,7 +162,7 @@ async def get_alarm_menu(user, chat, data):
     return menu, text
 
 async def get_cameras_menu(user, chat, data):
-    back_button, back_text_suggestion = _get_go_previous_menu_button_and_reference_text('cameras-menu', data)
+    back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('cameras-menu', data)
     menu, text = [], [ 'No tienes permiso para acceder a esta funcionalidad.', '', back_text_suggestion.capitalize() ]
     if await is_user_administrator_on_any_allowed_group(user, chat):
         cameras = []
@@ -176,7 +176,7 @@ async def get_cameras_menu(user, chat, data):
     return menu, text
 
 async def get_camera_menu(user, chat, data):
-    back_button, back_text_suggestion = _get_go_previous_menu_button_and_reference_text('camera-menu', data)
+    back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('camera-menu', data)
     menu, text = [], [ 'No tienes permiso para acceder a esta funcionalidad.', '', back_text_suggestion.capitalize() ]
     if await is_user_administrator_on_any_allowed_group(user, chat):
         camera_data = config.CAMERAS['devices'][data['camera-id']] if data['camera-id'] in config.CAMERAS['devices'] else None
@@ -187,7 +187,7 @@ async def get_camera_menu(user, chat, data):
     return menu, text
 
 async def get_dockers_menu(user, chat, data):
-    back_button, back_text_suggestion = _get_go_previous_menu_button_and_reference_text('dockers-menu', data)
+    back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('dockers-menu', data)
     menu, text = [], [ 'No tienes permiso para acceder a esta funcionalidad.', '', back_text_suggestion.capitalize() ]
     if await is_user_administrator_on_any_allowed_group(user, chat):
         for container in sorted(DockerUtils.get_containers(True), key = lambda container: container.name):
@@ -197,7 +197,7 @@ async def get_dockers_menu(user, chat, data):
     return menu, text
 
 async def get_docker_menu(user, chat, data):
-    back_button, back_text_suggestion = _get_go_previous_menu_button_and_reference_text('docker-menu', data)
+    back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('docker-menu', data)
     menu, text = [], [ 'No tienes permiso para acceder a esta funcionalidad.', '', back_text_suggestion.capitalize() ]
     if await is_user_administrator_on_any_allowed_group(user, chat):
         text = [ 'El contenedor indicado no se encuentra.', back_text_suggestion.capitalize() ]
@@ -217,7 +217,7 @@ async def _menu(update, context, data):
     chat, user = get_effective_chat(update), get_effective_user(update)
     menu, text = [], []
     if not is_user_allowed_to_interact_with_the_chat(user, chat):
-        exit_button, exit_text_suggestion = _get_go_previous_menu_button_and_reference_text('main-menu')
+        exit_button, exit_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('main-menu')
         menu, text = [ [ exit_button ] ], [ 'No tienes permiso para usar este bot.', '', exit_text_suggestion.capitalize() ]
     elif data['action'] == 'main-menu':
         menu, text = await get_main_menu(user, chat, data)
