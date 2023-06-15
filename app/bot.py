@@ -68,10 +68,9 @@ async def error_handler(update, context):
     logger.error('Se ha producido una excepción al procesar un mensaje: ', exc_info = context.error)
     if ('developer-chat' in config.TELEGRAM) and (config.TELEGRAM['developer-chat'] != 0): 
         traceback_string = "".join(traceback.format_exception(None, context.error, context.error.__traceback__))
-        update_str = update.to_dict() if isinstance(update, Update) else str(update)
         message = (
             'Se ha producido un error procesando un mensaje en la instalación de "{}"'.format(config.INSTALL_NAME),
-            '<pre>update = {}</pre>'.format(html.escape(json.dumps(update_str, indent = 2, ensure_ascii = False))),
+            '<pre>update = {}</pre>'.format(html.escape(json.dumps(update.to_dict() if isinstance(update, Update) else str(update), indent = 2, ensure_ascii = False))),
             '<pre>context.chat_data = {}</pre>'.format(html.escape(str(context.chat_data))),
             '<pre>context.user_data = {}</pre>'.format(html.escape(str(context.user_data))),
             '<pre>{}</pre>'.format(html.escape(traceback_string)),
