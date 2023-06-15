@@ -434,6 +434,7 @@ async def handle_invalid_button(update, context):
         'La acción solicitada no se reconoce.',
         'Si has usado el teclado, comprueba que no hayas cometido algún error de escritura.',
         'En caso que hayas hecho clic en el botón de un menú, te informamos de que los menús dejan de ser válidos al cabo de un tiempo, por lo que te recomendamos que no uses menús antiguos y que hagas clic en el botón "< salir" cuando acabes de utilizar el bot.'
+        'Para conocer la lista completa de comandos reconocidos teclea /commands',
     ]
     message = await update.effective_chat.send_message("\n\n".join(message), disable_notification = True)
     sleep(10)
