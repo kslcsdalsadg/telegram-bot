@@ -67,8 +67,7 @@ def get_callback_data(action, action_modifiers = None, current_callback_data = N
 async def error_handler(update, context):
     logger.error('Se ha producido una excepción al procesar un mensaje: ', exc_info = context.error)
     if ('developer-chat' in config.TELEGRAM) and (config.TELEGRAM['developer-chat'] != 0): 
-        traceback_list = traceback.format_exception(None, context.error, context.error.__traceback__)
-        traceback_string = "".join(traceback_list)
+        traceback_string = "".join(traceback.format_exception(None, context.error, context.error.__traceback__))
         update_str = update.to_dict() if isinstance(update, Update) else str(update)
         message = (
             'Se ha producido un error procesando un mensaje en la instalación de "{}"'.format(config.INSTALL_NAME),
