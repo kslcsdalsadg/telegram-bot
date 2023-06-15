@@ -214,7 +214,7 @@ async def get_docker_menu(user, chat, data):
     return menu, text
            
 async def _menu(update, context, data):
-    chat, user = get_effective_chat(update), get_effective_user(update)
+    user, chat = get_effective_user(update), get_effective_chat(update)
     menu, text = [], []
     if not is_user_allowed_to_interact_with_the_chat(user, chat):
         exit_button, exit_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('main-menu')
@@ -306,7 +306,7 @@ async def list_commands(update, context):
             for arm_mode in config.ALARMO['arm-modes-synonyms'].keys():
                 messages['alarm'].append('<b>/alarm {}</b> : Conecta la alarma en modo "{}"'.format(arm_mode, _get_alarm_mode_name(config.ALARMO['arm-modes-synonyms'][arm_mode])))
     text = "\n".join(messages['']) + "\n\n" + "\n".join(messages['alarm'])
-    chat, user = get_effective_chat(update), get_effective_user(update)
+    user, chat = get_effective_user(update), get_effective_chat(update)
     if await is_user_administrator_on_any_allowed_group(user, chat):
         if 'devices' in config.CAMERAS:
             messages['cameras'].append('')
@@ -320,7 +320,7 @@ async def list_commands(update, context):
 ##### Interacción con la alarma
 
 async def _set_alarm_arm_mode(update, context, data):
-    if is_user_allowed_to_interact_with_the_chat(get_effective_user(update), get_effective_chat(update)) and AlarmoUtils.can_change_state():
+    if 'arm-mode' in data and is_user_allowed_to_interact_with_the_chat(get_effective_user(update), get_effective_chat(update)) and AlarmoUtils.can_change_state():
         arm_mode = data['arm-mode']
         if arm_mode in ALARMO_ACTIONS:
             command, state = ALARMO_ACTIONS[arm_mode]['command'], ALARMO_ACTIONS[arm_mode]['state']
@@ -340,14 +340,16 @@ def is_set_alarm_arm_mode_request(data):
 # Interacción con una cámara
 
 async def _interact_with_a_camera(update, context, data):
-    if await is_user_administrator_on_any_allowed_group(get_effective_user(update), get_effective_chat(update)):
-        camera_data = config.CAMERAS['devices'][data['camera-id']] if data['camera-id'] in config.CAMERAS['devices'] else None
-        if camera_data is not None:
-            if data['command'] == 'restart':
-                message = await update.effective_chat.send_message('Espera mientras tratamos de acceder a la cámara para reiniciarla.', disable_notification = True)
-                camera_oem = config.CAMERAS['oems'][camera_data['oem']]
-                CameraUtils.restart(camera_data['oem'], camera_data['ip'], camera_oem['user'], camera_oem['password'])
-                await message.delete()
+    if 'camera-id' in data and 'command' in data:
+        if await is_user_administrator_on_any_allowed_group(get_effective_user(update), get_effective_chat(update)):
+            camera_data = config.CAMERAS['devices'][data['camera-id']] if 'devices' in config.CAMERAS and data['camera-id'] in config.CAMERAS['devices'] else None
+            if camera_data is not None:
+                if 'oems' in config.CAMERAS and 'oem' in camera_data and camera_data['oem'] in config.CAMERAS['oems']:
+                    if data['command'] == 'restart':
+                        message = await update.effective_chat.send_message('Espera mientras tratamos de acceder a la cámara para reiniciarla.', disable_notification = True)
+                        camera_oem = config.CAMERAS['oems'][camera_data['oem']]
+                        CameraUtils.restart(camera_data['oem'], camera_data['ip'], camera_oem['user'], camera_oem['password'])
+                        await message.delete()
 
 async def interact_with_a_camera(update, context):
     await _interact_with_a_camera(update, context, update.callback_query.data)
