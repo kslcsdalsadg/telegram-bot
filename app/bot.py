@@ -200,7 +200,7 @@ async def get_docker_menu(user, chat, data):
     back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('docker-menu', data)
     menu, text = [], [ 'No tienes permiso para acceder a esta funcionalidad.', '', back_text_suggestion.capitalize() ]
     if await is_user_administrator_on_any_allowed_group(user, chat):
-        text = [ 'El contenedor indicado no se encuentra.', back_text_suggestion.capitalize() ]
+        text = [ 'El contenedor indicado no se encuentra.', '', back_text_suggestion.capitalize() ]
         if DockerUtils.container_exists(data['docker-id']):
             name, is_running = DockerUtils.get_container_name(data['docker-id']), DockerUtils.is_container_running(data['docker-id'])
             if is_running:
@@ -209,7 +209,7 @@ async def get_docker_menu(user, chat, data):
             else:
                 menu.append([ InlineKeyboardButton(DOCKER_ACTIONS['start']['title'], callback_data = get_callback_data('interact-with-a-docker', action_modifiers = { 'docker-id': data['docker-id'], 'command': 'start' }, current_callback_data = data)) ])
                 menu.append([ InlineKeyboardButton(DOCKER_ACTIONS['delete']['title'], callback_data = get_callback_data('interact-with-a-docker', action_modifiers = { 'docker-id': data['docker-id'], 'command': 'delete' }, current_callback_data = data)) ])
-        text = [ 'El contenedor "{}" {}.'.format(name, 'se está ejecutando' if is_running else 'no se está ejecutando'), '', 'Haz clic sobre la opción deseada o {}'.format(back_text_suggestion) ]
+            text = [ 'El contenedor "{}" {}.'.format(name, 'se está ejecutando' if is_running else 'no se está ejecutando'), '', 'Haz clic sobre la opción deseada o {}'.format(back_text_suggestion) ]
     menu.append([ back_button ])
     return menu, text
            
