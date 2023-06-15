@@ -179,7 +179,7 @@ async def get_camera_menu(user, chat, data):
     back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('camera-menu', data)
     menu, text = [], [ 'No tienes permiso para acceder a esta funcionalidad.', '', back_text_suggestion.capitalize() ]
     if await is_user_administrator_on_any_allowed_group(user, chat):
-        camera_data = config.CAMERAS['devices'][data['camera-id']] if data['camera-id'] in config.CAMERAS['devices'] else None
+        camera_data = config.CAMERAS['devices'][data['camera-id']] if ('devices' in config.CAMERAS) and (data['camera-id'] in config.CAMERAS['devices']) else None
         if camera_data is not None:
             menu.append([ InlineKeyboardButton('Reiniciar la cámara', callback_data = get_callback_data('interact-with-a-camera', action_modifiers = { 'camera-id': data['camera-id'], 'command': 'restart' }, current_callback_data = data)) ])
         text = [ 'La dirección IP asociada a la cámara "{}" es la "{}.".'.format(camera_data['name'], camera_data['ip']), '', 'Haz clic sobre la acción a ejecutar o {}'.format(back_text_suggestion) ] if camera_data is not None else [ 'La cámara especificada no se encuentra.', '', back_text_suggestion.capitalize() ]
