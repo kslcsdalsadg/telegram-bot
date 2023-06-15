@@ -166,7 +166,7 @@ async def get_cameras_menu(user, chat, data):
     menu, text = [], [ 'No tienes permiso para acceder a esta funcionalidad.', '', back_text_suggestion.capitalize() ]
     if await is_user_administrator_on_any_allowed_group(user, chat):
         cameras = []
-        if config.CAMERAS['devices'] is not None:
+        if 'devices' in config.CAMERAS:
             for camera_id in config.CAMERAS['devices'].keys():
                 cameras.append({ 'id': camera_id, 'name': config.CAMERAS['devices'][camera_id]['name'] })
             for camera_data in sorted(cameras, key = lambda camera_data: camera_data['name']):
