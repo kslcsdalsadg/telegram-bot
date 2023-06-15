@@ -120,24 +120,6 @@ async def greet_chat_members(update, context):
     
 ##### Gestión de menús de Telegram
 
-MESSAGES = {}
-
-def _on_message_added(message):
-    chat_id, message_id = message.chat.id, message.id
-    MESSAGES[chat_id][message_id] = True
-    
-
-def _on_message_removed(message):
-    chat_id, message_id = message.chat.id, message.id
-    if chat_id in MESSAGES and message_id in MESSAGES[chat_id]: 
-        MESSAGES[chat_id].pop(message_id)
-    
-async def _on_bot_stop(application):
-    for chat_id in MESSAGES:
-        for message_id in MESSAGES[chat_id]:
-            await application.bot.delete_message(chat_id, message_id)
-            MESSAGES[chat_id].pop(message_id)           
-
 def _get_go_previous_menu_button_and_reference_text(current_menu, data):
     action, action_text, text = 'exit', '< Salir', 'pulsa el botón "&lt; Salir" para continuar.'
     root_menu = data['root-menu'] if (data is not None) and ('root-menu' in data) else 'main-menu'
@@ -456,7 +438,7 @@ if __name__ == '__main__':
     MqttAgent.initialize()
     AlarmoUtils.initialize()
     DockerUtils.initialize()
-    application = Application.builder().token(config.TELEGRAM['bot-token']).arbitrary_callback_data(True).post_init(post_init).post_stop(_on_bot_stop).post_stop(post_stop).build()
+    application = Application.builder().token(config.TELEGRAM['bot-token']).arbitrary_callback_data(True).post_init(post_init).post_stop(post_stop).build()
     application.add_error_handler(error_handler)
     application.add_handler(ChatMemberHandler(greet_chat_members, ChatMemberHandler.CHAT_MEMBER))
     application.add_handler(CommandHandler([ 'menu', 'start' ], menu))
