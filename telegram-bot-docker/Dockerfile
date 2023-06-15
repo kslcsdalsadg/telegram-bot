@@ -8,7 +8,7 @@ RUN pip install --upgrade pip
 
 # Telegram requirements
 
-RUN pip install python-telegram-bot paho-mqtt docker
+RUN pip install python-telegram-bot python-telegram-bot[callback-data] paho-mqtt docker
 
 # Tapo requirements
 
