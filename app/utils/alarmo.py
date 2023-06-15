@@ -25,7 +25,8 @@ class AlarmoUtils():
         return MqttAgent.get_last_message(config.ALARMO['mqtt-topics']['state']) 
     
     @staticmethod
-    def send_command(command, requested_state, timeout = CONFIG['default-timeout-for-commands']):
+    def send_command(command, requested_state, timeout = 0):
+        timeout = AlarmoUtils.CONFIG['default-timeout-for-commands'] if timeout <= 0 else timeout
         if MqttAgent.is_connected():
             payload = { 'command': command, 'skip_delay': True }
             if command != 'DISARM': 

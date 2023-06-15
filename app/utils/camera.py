@@ -15,7 +15,7 @@ class CameraUtils():
         tapo = Tapo(ip_address, username, password)
         tapo.reboot()
         sleep(15)
-        for i in range(CONFIG['max-wait-time-for-tapo-camera-reboot']):
+        for i in range(CameraUtils.CONFIG['max-wait-time-for-tapo-camera-reboot']):
             if CameraUtils._is_tapo_online(ip_address): 
                 break 
             sleep(i)
