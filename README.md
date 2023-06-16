@@ -8,3 +8,5 @@ He creado un bot de Telegram para poder acceder a las siguientes interfaces en m
 
 El código fuente está en el directorio "app"
 Se puede correr sobre un docker (se incluyen el docker-compose y la receta Dockerfile correspondiente). Notar que, para el control de los dockers, se mapea en el docker el archivo /var/run/docker.sock del host.
+
+![Captura de Pantalla](screenshot.jpg)
