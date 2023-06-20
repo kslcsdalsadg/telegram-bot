@@ -6,8 +6,12 @@ LOG_LEVEL = logging.WARNING
 
 TELEGRAM = {
     'bot-token': 'TOKEN',
-    'allowed-groups': [ -10012345678 ],                         # Grupos cuyos usuarios pueden interactuar con el chat
-    'allowed-users': [ 12345678 ],                              # Usuarios que pueden interactuar con el chat por privado
+    'allowed-groups': [ -10012345678 ],                         # El bot responde por privado o bien cuando se le habla en alguno de los grupos de la lista
+    'allowed-users': {                                          # Usuarios que pueden interactuar con el chat, bien por privado o bien en un grupo
+        '12345678': True,                                       # El usuario '12345678' es un usuario administrador y puede ejecutar cualquier operación
+        '90123456': False,                                      # El usuario '90123456' no es un usuario administrador y puede ejecutar las operaciones consideradas normales: iniciar y parar la alarma
+    },
+    'administrative-users': [ 12345678 ],                       # Usuarios que pueden interactuar con el chat, bien por privado o bien en un grupo, y que pueden ejecutar operaciones privilegiadas (dockers, cámaras, etc)
     'developer-chat': -10012345678,                             # Chat al que se enviarán los mensajes de error (opcional)
 }
 

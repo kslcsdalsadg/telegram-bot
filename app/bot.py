@@ -1,5 +1,5 @@
 from telegram import Update, ChatMember, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
-from telegram.constants import ParseMode
+from telegram.constants import ParseMode, ChatType
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, InvalidCallbackData, ChatMemberHandler
 from time import sleep
 
@@ -79,18 +79,17 @@ async def error_handler(update, context):
     
 ##### Gestión de usuarios autorizados
 
-def is_user_allowed_to_interact_with_the_chat(user, chat):
-    if (chat is not None) and (chat.id in config.TELEGRAM['allowed-groups']): 
-        return True
-    if (user is not None) and (user.id in config.TELEGRAM['allowed-users']) :
-        return True
-    return False
+def is_user_allowed_to_interact_with_the_chat(user, chat = None):
+    if (chat is not None) and (chat.type != ChatType.PRIVATE) and (chat.id not in config.TELEGRAM['allowed-groups']): 
+        return False
+    return (user is not None) and ((str(user.id) in config.TELEGRAM['allowed-users'].keys()) or (user.username in config.TELEGRAM['allowed-users'].keys()))
     
-async def is_user_administrator_on_any_allowed_group(user, chat):
-    if (user is not None) and (chat is not None) and (chat.id in config.TELEGRAM['allowed-groups']):
-        for administrator in await chat.get_administrators():
-            if user.id == administrator.user.id: 
-                return True
+async def is_user_allowed_to_exec_administrative_commands(user):
+    if is_user_allowed_to_interact_with_the_chat(user):
+        if str(user.id) in config.TELEGRAM['allowed-users'].keys(): 
+            return config.TELEGRAM['allowed-users'][str(user.id)]
+        if user.username in config.TELEGRAM['allowed-users'].keys(): 
+            return config.TELEGRAM['allowed-users'][user.username]
     return False
 
 ##### Mostramos un mensaje cuando se une un nuevo usuario o cuando alguien abandona un grupo
@@ -120,7 +119,7 @@ async def greet_chat_members(update, context):
     
 ##### Gestión de menús de Telegram
 
-def _get_go_previous_menu_button_and_text_suggestion(current_menu, data):
+def _get_go_previous_menu_button_and_text_suggestion(current_menu, data = None):
     action, action_text, text = 'exit', '< Salir', 'pulsa el botón "&lt; Salir" para continuar.'
     root_menu = data['root-menu'] if (data is not None) and ('root-menu' in data) else 'main-menu'
     if current_menu != root_menu:
@@ -136,7 +135,7 @@ async def get_main_menu(user, chat, data):
     menu, text = [], []
     if AlarmoUtils.can_change_state():
         menu.append([ InlineKeyboardButton('Gestionar la alarma', callback_data = get_callback_data('alarm-menu', current_callback_data = data)) ])
-    if await is_user_administrator_on_any_allowed_group(user, chat):
+    if await is_user_allowed_to_exec_administrative_commands(user):
         if 'devices' in config.CAMERAS:
             menu.append([ InlineKeyboardButton('Gestionar las cámaras', callback_data = get_callback_data('cameras-menu', current_callback_data = data)) ])
         menu.append([ InlineKeyboardButton('Gestionar los contenedores', callback_data = get_callback_data('dockers-menu', current_callback_data = data)) ])
@@ -164,7 +163,7 @@ async def get_alarm_menu(user, chat, data):
 async def get_cameras_menu(user, chat, data):
     back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('cameras-menu', data)
     menu, text = [], [ 'No tienes permiso para acceder a esta funcionalidad.', '', back_text_suggestion.capitalize() ]
-    if await is_user_administrator_on_any_allowed_group(user, chat):
+    if await is_user_allowed_to_exec_administrative_commands(user):
         cameras = []
         if 'devices' in config.CAMERAS:
             for camera_id in config.CAMERAS['devices'].keys():
@@ -178,7 +177,7 @@ async def get_cameras_menu(user, chat, data):
 async def get_camera_menu(user, chat, data):
     back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('camera-menu', data)
     menu, text = [], [ 'No tienes permiso para acceder a esta funcionalidad.', '', back_text_suggestion.capitalize() ]
-    if await is_user_administrator_on_any_allowed_group(user, chat):
+    if await is_user_allowed_to_exec_administrative_commands(user):
         camera_data = config.CAMERAS['devices'][data['camera-id']] if ('devices' in config.CAMERAS) and (data['camera-id'] in config.CAMERAS['devices']) else None
         if camera_data is not None:
             menu.append([ InlineKeyboardButton('Reiniciar la cámara', callback_data = get_callback_data('interact-with-a-camera', action_modifiers = { 'camera-id': data['camera-id'], 'command': 'restart' }, current_callback_data = data)) ])
@@ -189,7 +188,7 @@ async def get_camera_menu(user, chat, data):
 async def get_dockers_menu(user, chat, data):
     back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('dockers-menu', data)
     menu, text = [], [ 'No tienes permiso para acceder a esta funcionalidad.', '', back_text_suggestion.capitalize() ]
-    if await is_user_administrator_on_any_allowed_group(user, chat):
+    if await is_user_allowed_to_exec_administrative_commands(user):
         for container in sorted(DockerUtils.get_containers(True), key = lambda container: container.name):
             menu.append([ InlineKeyboardButton(container.name, callback_data = get_callback_data('docker-menu', action_modifiers = { 'docker-id': container.id }, current_callback_data = data)) ])
         text = [ 'A continuación se muestra la lista de contenedores.', '', 'Haz clic en el nombre de uno de ellos para ver las opciones disponibles o {}'.format(back_text_suggestion) ]
@@ -199,7 +198,7 @@ async def get_dockers_menu(user, chat, data):
 async def get_docker_menu(user, chat, data):
     back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('docker-menu', data)
     menu, text = [], [ 'No tienes permiso para acceder a esta funcionalidad.', '', back_text_suggestion.capitalize() ]
-    if await is_user_administrator_on_any_allowed_group(user, chat):
+    if await is_user_allowed_to_exec_administrative_commands(user):
         text = [ 'El contenedor indicado no se encuentra.', '', back_text_suggestion.capitalize() ]
         if DockerUtils.container_exists(data['docker-id']):
             name, is_running = DockerUtils.get_container_name(data['docker-id']), DockerUtils.is_container_running(data['docker-id'])
@@ -307,7 +306,7 @@ async def list_commands(update, context):
                 messages['alarm'].append('<b>/alarm {}</b> : Conecta la alarma en modo "{}"'.format(arm_mode, _get_alarm_mode_name(config.ALARMO['arm-modes-synonyms'][arm_mode])))
     text = "\n".join(messages['']) + "\n\n" + "\n".join(messages['alarm'])
     user, chat = get_effective_user(update), get_effective_chat(update)
-    if await is_user_administrator_on_any_allowed_group(user, chat):
+    if await is_user_allowed_to_exec_administrative_commands(user):
         if 'devices' in config.CAMERAS:
             messages['cameras'].append('')
             for camera_id in config.CAMERAS['devices']:
@@ -341,7 +340,7 @@ def is_set_alarm_arm_mode_request(data):
 
 async def _interact_with_a_camera(update, context, data):
     if 'camera-id' in data and 'command' in data:
-        if await is_user_administrator_on_any_allowed_group(get_effective_user(update), get_effective_chat(update)):
+        if await is_user_allowed_to_exec_administrative_commands(get_effective_user(update)):
             camera_data = config.CAMERAS['devices'][data['camera-id']] if 'devices' in config.CAMERAS and data['camera-id'] in config.CAMERAS['devices'] else None
             if camera_data is not None:
                 if 'oems' in config.CAMERAS and 'oem' in camera_data and camera_data['oem'] in config.CAMERAS['oems']:
@@ -373,7 +372,7 @@ async def handle_camera_command(update, context):
 async def interact_with_a_docker(update, context):
     data = update.callback_query.data
     if 'command' in data and 'docker-id' in data:
-        if await is_user_administrator_on_any_allowed_group(get_effective_user(update), get_effective_chat(update)):
+        if await is_user_allowed_to_exec_administrative_commands(get_effective_user(update)):
             if data['command'] in DOCKER_ACTIONS:
                 message = await update.effective_chat.send_message('Espera mientras tratamos de acceder al contenedor para {}.'.format(DOCKER_ACTIONS[data['command']]['action']), disable_notification = True)
                 if data['command'] == 'delete':
