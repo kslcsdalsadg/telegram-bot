@@ -456,7 +456,7 @@ async def handle_invalid_button(update, context):
 
 async def post_init(application):
     BOT_MESSAGES.clear()
-    await application.bot.set_my_commands([ BotCommand('alarm', 'para visualizar las opciones de la alarma.'), BotCommand('cameras', 'para visualizar las opciones de gestión de cámaras.'), BotCommand('commands', 'para visualizar la lista de comandos disponibles.'), BotCommand('dockers', 'para visualizar las opciones de gestión de contenedores.'), BotCommand('menu', 'para visualizar el menú del bot.') ])
+    await application.bot.set_my_commands([ BotCommand('alarm', 'para visualizar las opciones de la alarma.'), BotCommand('cameras', 'para visualizar las opciones de gestión de cámaras.'), BotCommand('commands', 'para visualizar la lista de comandos disponibles.'), BotCommand('dockers', 'para visualizar las opciones de gestión de contenedores.'), BotCommand('menu', 'para visualizar el menú del bot.'), BotCommand('whatsmyip', 'para visualizar la dirección IP pública del router.') ])
 
 async def post_stop(application): 
     for chat_id in BOT_MESSAGES:
