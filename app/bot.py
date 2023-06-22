@@ -423,7 +423,7 @@ def is_whats_my_ip_request(data):
 
 async def handle_whats_my_ip_command(update, context):
     await update.message.delete()
-    await _whats_my_ip(upate, context)
+    await _whats_my_ip(update, context)
 
 ##### El usuario quiere ocultar el menú
 
