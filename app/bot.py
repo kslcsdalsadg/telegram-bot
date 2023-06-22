@@ -7,6 +7,7 @@ from utils.docker import DockerUtils
 from utils.mqtt import MqttAgent
 from utils.alarmo import AlarmoUtils
 from utils.camera import CameraUtils
+from utils.whats_my_ip import WhatsMyIp
 
 import config
 
@@ -139,6 +140,7 @@ async def get_main_menu(user, chat, data):
         if 'devices' in config.CAMERAS:
             menu.append([ InlineKeyboardButton('Gestionar las cámaras', callback_data = get_callback_data('cameras-menu', current_callback_data = data)) ])
         menu.append([ InlineKeyboardButton('Gestionar los contenedores', callback_data = get_callback_data('dockers-menu', current_callback_data = data)) ])
+    menu.append([ InlineKeyboardButton('Obtener la IP pública del router', callback_data = get_callback_data('whats-my-ip', current_callback_data = data)) ])
     text = [ 'Selecciona una opción para continuar o {}'.format(exit_text_suggestion) ] if len(menu) > 0 else [ 'Ahora mismo no hay opciones disponibles.', '', exit_text_suggestion.capitalize() ]
     menu.append([ exit_button ])
     return menu, text
@@ -277,6 +279,7 @@ async def list_commands(update, context):
             '<u>General</u>',
             '',
             '<b>/menu</b>: Muestra el menú general',
+            '<b>/whatsmyip</b>: Muestra la IP pública del router',
         ],
         'alarm': [
             '<u>Gestión de la alarma:</u>',
@@ -396,6 +399,24 @@ async def interact_with_a_docker(update, context):
 def is_interact_with_a_docker_request(data):
     return isinstance(data, dict) and 'action' in data and data['action'] == 'interact-with-a-docker';
 
+##### Obtener la IP pública del router
+
+async def _whats_my_ip(update, context):
+    if is_user_allowed_to_interact_with_the_chat(get_effective_user(update), get_effective_chat(update)):
+        message = await update.effective_chat.send_message('Espera mientras tratamos de obtener la dirección pública del router.')
+        ip = WhatsMyIp.get()
+        await message.edit_text('La dirección IP del router es la "{}"'.format(ip) if ip is not None else 'No se ha podido obtener la dirección IP del router')
+
+async def whats_my_ip(update, context):
+    await _whats_my_ip(update, context)
+
+def is_whats_my_ip_request(data):
+    return isinstance(data, dict) and 'action' in data and data['action'] == 'whats-my-ip'
+
+async def handle_whats_my_ip_command(update, context):
+    await update.message.delete()
+    await _whats_my_ip(upate, context)
+
 ##### El usuario quiere ocultar el menú
 
 async def exit_menu(update, context):
@@ -443,15 +464,17 @@ if __name__ == '__main__':
     application.add_error_handler(error_handler)
     application.add_handler(ChatMemberHandler(greet_chat_members, ChatMemberHandler.CHAT_MEMBER))
     application.add_handler(CommandHandler([ 'menu', 'start' ], menu))
+    application.add_handler(CommandHandler([ 'commands', 'help' ], list_commands))
     application.add_handler(CommandHandler('alarm', alarm_menu))
     application.add_handler(CommandHandler('cameras', cameras_menu))
     application.add_handler(CommandHandler('camera', handle_camera_command))
-    application.add_handler(CommandHandler([ 'commands', 'help' ], list_commands))
     application.add_handler(CommandHandler('dockers', dockers_menu))
+    application.add_handler(CommandHandler('whatsmyip', handle_whats_my_ip_command))
     application.add_handler(CallbackQueryHandler(menu, pattern = is_menu_request))
     application.add_handler(CallbackQueryHandler(set_alarm_arm_mode, pattern = is_set_alarm_arm_mode_request))
     application.add_handler(CallbackQueryHandler(interact_with_a_camera, pattern = is_interact_with_a_camera_request))
     application.add_handler(CallbackQueryHandler(interact_with_a_docker, pattern = is_interact_with_a_docker_request))
+    application.add_handler(CallbackQueryHandler(whats_my_ip, pattern = is_whats_my_ip_request))
     application.add_handler(CallbackQueryHandler(exit_menu, pattern = is_exit_menu_request))
     application.add_handler(CallbackQueryHandler(handle_invalid_button, pattern = InvalidCallbackData))
     application.run_polling(allowed_updates = Update.ALL_TYPES)
