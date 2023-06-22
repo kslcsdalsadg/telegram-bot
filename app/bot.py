@@ -331,6 +331,8 @@ async def _set_alarm_arm_mode(update, context, data):
             await message.delete()
             if success and 'root-menu' in data:
                 await _menu(update, context, { 'action': 'alarm-menu', 'root-menu': data['root-menu'] })
+            elif update.callback_query:
+                await update.callback_query.answer()
 
 async def set_alarm_arm_mode(update, context):
     data = update.callback_query.data
@@ -352,6 +354,8 @@ async def _interact_with_a_camera(update, context, data):
                         camera_oem = config.CAMERAS['oems'][camera_data['oem']]
                         CameraUtils.restart(camera_data['oem'], camera_data['ip'], camera_oem['user'], camera_oem['password'])
                         await message.delete()
+                        if update.callback_query:
+                            await update.callback_query.answer()
 
 async def interact_with_a_camera(update, context):
     await _interact_with_a_camera(update, context, update.callback_query.data)
@@ -395,6 +399,8 @@ async def interact_with_a_docker(update, context):
                         data['action'] = 'docker-menu'
                         await _menu(update, context, data)
                 await message.delete()
+                if update.callback_query:
+                    await update.callback_query.answer()
 
 def is_interact_with_a_docker_request(data):
     return isinstance(data, dict) and 'action' in data and data['action'] == 'interact-with-a-docker';
@@ -406,6 +412,8 @@ async def _whats_my_ip(update, context):
         message = await update.effective_chat.send_message('Espera mientras tratamos de obtener la dirección pública del router.')
         ip = WhatsMyIp.get()
         await message.edit_text('La dirección IP del router es la "{}"'.format(ip) if ip is not None else 'No se ha podido obtener la dirección IP del router')
+        if update.callback_query:
+            await update.callback_query.answer()
 
 async def whats_my_ip(update, context):
     await _whats_my_ip(update, context)
