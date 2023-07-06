@@ -63,6 +63,12 @@ def get_callback_data(action, action_modifiers = None, current_callback_data = N
     callback_data['action'] = action
     return callback_data
 
+async def callback_query_answer(update):
+    try:
+        await update.callback_query.answer()
+    except:
+        pass
+    
 ##### Gestión de errores Telegram
 
 async def error_handler(update, context):
@@ -233,7 +239,7 @@ async def _menu(update, context, data):
     elif data['action'] == 'docker-menu':
         menu, text = await get_docker_menu(user, chat, data)
     if update.callback_query:
-        await update.callback_query.answer()
+        await callback_query_answer(update)
         await update.callback_query.message.edit_text("\n".join(text), parse_mode = ParseMode.HTML, reply_markup = InlineKeyboardMarkup(menu))
     else:
         message = await update.effective_chat.send_message("\n".join(text), parse_mode = ParseMode.HTML, reply_markup = InlineKeyboardMarkup(menu), disable_notification = True)
@@ -332,7 +338,7 @@ async def _set_alarm_arm_mode(update, context, data):
             if success and 'root-menu' in data:
                 await _menu(update, context, { 'action': 'alarm-menu', 'root-menu': data['root-menu'] })
             elif update.callback_query:
-                await update.callback_query.answer()
+                await callback_query_answer(update)
 
 async def set_alarm_arm_mode(update, context):
     data = update.callback_query.data
@@ -355,7 +361,7 @@ async def _interact_with_a_camera(update, context, data):
                         CameraUtils.restart(camera_data['oem'], camera_data['ip'], camera_oem['user'], camera_oem['password'])
                         await message.delete()
                         if update.callback_query:
-                            await update.callback_query.answer()
+                            await callback_query_answer(update)
 
 async def interact_with_a_camera(update, context):
     await _interact_with_a_camera(update, context, update.callback_query.data)
@@ -400,7 +406,7 @@ async def interact_with_a_docker(update, context):
                         await _menu(update, context, data)
                 await message.delete()
                 if update.callback_query:
-                    await update.callback_query.answer()
+                    await callback_query_answer(update)
 
 def is_interact_with_a_docker_request(data):
     return isinstance(data, dict) and 'action' in data and data['action'] == 'interact-with-a-docker';
@@ -413,7 +419,7 @@ async def _whats_my_ip(update, context):
         ip = WhatsMyIp.get()
         await message.edit_text('La dirección IP del router es la "{}"'.format(ip) if ip is not None else 'No se ha podido obtener la dirección IP del router')
         if update.callback_query:
-            await update.callback_query.answer()
+            await callback_query_answer(update)
 
 async def whats_my_ip(update, context):
     await _whats_my_ip(update, context)
@@ -428,7 +434,7 @@ async def handle_whats_my_ip_command(update, context):
 ##### El usuario quiere ocultar el menú
 
 async def exit_menu(update, context):
-    await update.callback_query.answer()
+    await callback_query_answer(update)
     message = update.callback_query.message
     await message.delete()
     if message.chat.id in BOT_MESSAGES and message.id in BOT_MESSAGES[message.chat.id]:
@@ -440,7 +446,7 @@ def is_exit_menu_request(data):
 ##### Opción inválida
 
 async def handle_invalid_button(update, context):
-    await update.callback_query.answer()
+    await callback_query_answer(update)
     message = [
         'La acción solicitada no se reconoce.',
         'Si has usado el teclado, comprueba que no hayas cometido algún error de escritura.',
