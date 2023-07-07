@@ -90,13 +90,13 @@ class DockerUtils():
         if not DockerUtils.is_container_running(id):
             docker_compose_file = DockerUtils._get_compose_file(id)
             if docker_compose_file is not None:
-                command = 'docker-compose -f "%s" up -d %s' % ( docker_compose_file, DockerUtils.get_container_name(id) )
+                command = 'docker-compose -f "%s" up -d' % ( docker_compose_file )
                 logger.info('Intentando ejecutar un comando de sistema: ' + command)
                 if os.system(command) == 0:
                     for i in range(DockerUtils.CONFIG['wait-time-for-container-start']):
                         sleep(1)
-                    if DockerUtils.is_container_running(id):
-                        return True
+                        if DockerUtils.is_container_running(id):
+                            return True
             return False
         return True
                     
