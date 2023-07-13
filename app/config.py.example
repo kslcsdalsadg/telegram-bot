@@ -80,7 +80,7 @@ DOCKERS = {
 VPN = {
    'type': 'docker',                                           # El tipo de la VPN. De momento solo ofrecemos soporte para VPN que funcionan en un contenedor.
    'docker': 'NOMBRE',                                         # El nombre del docker que implementa la VPN.
-    'bypassed-confirmations': {
+   'bypassed-confirmations': {
         'start': False,
         'stop': False,
     },
