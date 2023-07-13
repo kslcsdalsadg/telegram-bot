@@ -28,16 +28,36 @@ ALARMO_ACTIONS = {
 }
 
 DOCKER_ACTIONS = {
-    'start': { 'title': 'Iniciar el contenedor', 'action': 'iniciarlo' },
-    'stop': {'title': 'Parar el contenedor', 'action': 'pararlo'},
-    'restart': {'title': 'Reiniciar el contenedor', 'action': 'reiniciarlo'},
-    'delete': {'title': 'Eliminar el contenedor', 'action': 'eliminarlo'},
+    'start': { 'title': 'Iniciar el contenedor', 'action': 'iniciarlo', 'confirm-action': 'iniciar' },
+    'stop': {'title': 'Parar el contenedor', 'action': 'pararlo', 'confirm-action': 'parar'},
+    'restart': {'title': 'Reiniciar el contenedor', 'action': 'reiniciarlo', 'confirm-action': 'reiniciar' },
+    'delete': {'title': 'Eliminar el contenedor', 'action': 'eliminarlo', 'confirm-action': 'eliminar' },
 }
 
 BOT_MESSAGES = {}
 
 logger = logging.getLogger(__name__)
-             
+
+##### Funciones auxiliares
+
+def config_block_exists(name):
+    return hasattr(config, name)
+
+##### Gestión de errores Telegram
+
+async def error_handler(update, context):
+    logger.error('Se ha producido una excepción al procesar un mensaje: ', exc_info = context.error)
+    if ('developer-chat' in config.TELEGRAM) and (config.TELEGRAM['developer-chat'] != 0):
+        traceback_string = "".join(traceback.format_exception(None, context.error, context.error.__traceback__))
+        message = (
+            'Se ha producido un error procesando un mensaje en la instalación de "{}"'.format(config.INSTALL_NAME),
+            '<pre>update = {}</pre>'.format(html.escape(json.dumps(update.to_dict() if isinstance(update, Update) else str(update), indent = 2, ensure_ascii = False))),
+            '<pre>context.chat_data = {}</pre>'.format(html.escape(str(context.chat_data))),
+            '<pre>context.user_data = {}</pre>'.format(html.escape(str(context.user_data))),
+            '<pre>{}</pre>'.format(html.escape(traceback_string)),
+        )
+        await context.bot.send_message(chat_id = config.TELEGRAM['developer-chat'], text = "\n\n".join(message), parse_mode = ParseMode.HTML, disable_notification = True)
+
 ##### Funciones auxiliares para Telegram
 
 def get_effective_chat(update):
@@ -65,31 +85,33 @@ def get_callback_data(action, action_modifiers = None, current_callback_data = N
 
 async def callback_query_answer(update):
     try:
-        await update.callback_query.answer()
+        if update.callback_query:
+            await update.callback_query.answer()
     except:
         pass
-    
-##### Gestión de errores Telegram
 
-async def error_handler(update, context):
-    logger.error('Se ha producido una excepción al procesar un mensaje: ', exc_info = context.error)
-    if ('developer-chat' in config.TELEGRAM) and (config.TELEGRAM['developer-chat'] != 0): 
-        traceback_string = "".join(traceback.format_exception(None, context.error, context.error.__traceback__))
-        message = (
-            'Se ha producido un error procesando un mensaje en la instalación de "{}"'.format(config.INSTALL_NAME),
-            '<pre>update = {}</pre>'.format(html.escape(json.dumps(update.to_dict() if isinstance(update, Update) else str(update), indent = 2, ensure_ascii = False))),
-            '<pre>context.chat_data = {}</pre>'.format(html.escape(str(context.chat_data))),
-            '<pre>context.user_data = {}</pre>'.format(html.escape(str(context.user_data))),
-            '<pre>{}</pre>'.format(html.escape(traceback_string)),
-        )
-        await context.bot.send_message(chat_id = config.TELEGRAM['developer-chat'], text = "\n\n".join(message), parse_mode = ParseMode.HTML, disable_notification = True)
-    
+async def send_menu_message(update, text, menu):
+    if update.callback_query:
+        await update.callback_query.message.edit_text("\n".join(text), parse_mode = ParseMode.HTML, reply_markup = InlineKeyboardMarkup(menu))
+    else:
+        message = await update.effective_chat.send_message("\n".join(text), parse_mode = ParseMode.HTML, reply_markup = InlineKeyboardMarkup(menu), disable_notification = True)
+        if not message.chat.id in BOT_MESSAGES:
+            BOT_MESSAGES[message.chat.id] = {}
+        BOT_MESSAGES[message.chat.id][message.id] = True
+
+async def delete_menu_message(message):
+    await message.delete()
+    if message.chat.id in BOT_MESSAGES and message.id in BOT_MESSAGES[message.chat.id]:
+        BOT_MESSAGES[message.chat.id].pop(message.id)
+
 ##### Gestión de usuarios autorizados
 
 def is_user_allowed_to_interact_with_the_chat(user, chat = None):
-    if (chat is not None) and (chat.type != ChatType.PRIVATE) and (chat.id not in config.TELEGRAM['allowed-groups']): 
-        return False
-    return (user is not None) and ((str(user.id) in config.TELEGRAM['allowed-users'].keys()) or (user.username in config.TELEGRAM['allowed-users'].keys()))
+    if config.TELEGRAM:
+      if (chat is not None) and (chat.type != ChatType.PRIVATE) and (chat.id not in config.TELEGRAM['allowed-groups']): 
+          return False
+      return (user is not None) and ((str(user.id) in config.TELEGRAM['allowed-users'].keys()) or (user.username in config.TELEGRAM['allowed-users'].keys()))
+    return False
     
 async def is_user_allowed_to_exec_administrative_commands(user):
     if is_user_allowed_to_interact_with_the_chat(user):
@@ -123,7 +145,7 @@ async def greet_chat_members(update, context):
             text = [ '"{}" ({}) ha salido del grupo.'.format(user.mention_html(), user.id) ]
         if text is not None:
             await update.effective_chat.send_message("\n\n".join(text), parse_mode = ParseMode.HTML, disable_notification = True)
-    
+
 ##### Gestión de menús de Telegram
 
 def _get_go_previous_menu_button_and_text_suggestion(current_menu, data = None):
@@ -139,32 +161,37 @@ def _get_go_previous_menu_button_and_text_suggestion(current_menu, data = None):
 
 async def get_main_menu(user, chat, data):
     exit_button, exit_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('main-menu', data)
-    menu, text = [], []
-    if AlarmoUtils.can_change_state():
-        menu.append([ InlineKeyboardButton('Gestionar la alarma', callback_data = get_callback_data('alarm-menu', current_callback_data = data)) ])
+    menu = []
+    if config_block_exists('ALARMO') and AlarmoUtils.can_change_state():
+        menu.append([ InlineKeyboardButton('Gestiona tu alarma', callback_data = get_callback_data('alarm-menu', current_callback_data = data)) ])
     if await is_user_allowed_to_exec_administrative_commands(user):
-        if 'devices' in config.CAMERAS:
-            menu.append([ InlineKeyboardButton('Gestionar las cámaras', callback_data = get_callback_data('cameras-menu', current_callback_data = data)) ])
-        menu.append([ InlineKeyboardButton('Gestionar los contenedores', callback_data = get_callback_data('dockers-menu', current_callback_data = data)) ])
-    menu.append([ InlineKeyboardButton('Obtener la IP pública del router', callback_data = get_callback_data('whats-my-ip', current_callback_data = data)) ])
-    text = [ 'Selecciona una opción para continuar o {}'.format(exit_text_suggestion) ] if len(menu) > 0 else [ 'Ahora mismo no hay opciones disponibles.', '', exit_text_suggestion.capitalize() ]
+        if config_block_exists('CAMERAS') and 'devices' in config.CAMERAS:
+            menu.append([ InlineKeyboardButton('Gestiona tus cámaras', callback_data = get_callback_data('cameras-menu', current_callback_data = data)) ])
+        if config_block_exists('DOCKERS'):
+            menu.append([ InlineKeyboardButton('Gestiona tus contenedores', callback_data = get_callback_data('dockers-menu', current_callback_data = data)) ])
+        if config_block_exists('VPN'):
+            menu.append([InlineKeyboardButton('Gestiona tu VPN', callback_data=get_callback_data('vpn-menu', current_callback_data = data))])
+    menu.append([ InlineKeyboardButton('Muestra la IP pública del router', callback_data = get_callback_data('whats-my-ip', current_callback_data = data)) ])
+    text = [ 'Selecciona una opción para continuar o {}'.format(exit_text_suggestion) ]
     menu.append([ exit_button ])
     return menu, text
 
-def _get_alarm_mode_name(arm_mode):
+def _get_alarmo_arm_mode_name(arm_mode):
     return config.ALARMO['arm-modes-names'][arm_mode] if ('arm-modes-names' in config.ALARMO) and (arm_mode in config.ALARMO['arm-modes-names']) else ALARMO_ACTIONS[arm_mode]['name']
 
 async def get_alarm_menu(user, chat, data):
     back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('alarm-menu', data)
-    menu, text = [], []
-    if AlarmoUtils.can_change_state():
-        if AlarmoUtils.get_state() == 'disarmed':
-            for arm_mode in config.ALARMO['arm-modes']:
-                if arm_mode in ALARMO_ACTIONS:
-                    menu.append([ InlineKeyboardButton('Conectar la alarma en modo "{}"'.format(_get_alarm_mode_name(arm_mode)), callback_data = get_callback_data('set-alarm-arm-mode', action_modifiers = { 'arm-mode': arm_mode }, current_callback_data = data)) ])
-        else:
-            menu.append([ InlineKeyboardButton('Desconectar la alarma', callback_data = get_callback_data('set-alarm-arm-mode', action_modifiers = { 'arm-mode': 'disarm' }, current_callback_data = data)) ])
-    text = [ 'A continuación te mostramos las opciones de gestión de la alarma.', '', 'Haz clic en una de ellas o {}'.format(back_text_suggestion) ] if len(menu) > 0 else [ 'Ahora mismo no es posible interactuar con la alarma.', '', back_text_suggestion.capitalize() ]
+    menu, text = [], [ 'Se ha restringido el acceso a esta funcionalidad en el archivo de configuración.', '', back_text_suggestion.capitalize() ]
+    if config_block_exists('ALARMO'):
+        text = ['Ahora mismo no se puede interactuar con tu alarma.', '', back_text_suggestion.capitalize()]
+        if AlarmoUtils.can_change_state():
+            if AlarmoUtils.get_state() == 'disarmed':
+                for arm_mode in config.ALARMO['arm-modes']:
+                    if arm_mode in ALARMO_ACTIONS:
+                        menu.append([ InlineKeyboardButton('Conecta la alarma en modo "{}"'.format(_get_alarmo_arm_mode_name(arm_mode)), callback_data = get_callback_data('set-alarm-arm-mode', action_modifiers = { 'arm-mode': arm_mode }, current_callback_data = data)) ])
+            else:
+                menu.append([ InlineKeyboardButton('Desconecta la alarma', callback_data = get_callback_data('set-alarm-arm-mode', action_modifiers = { 'arm-mode': 'disarm' }, current_callback_data = data)) ])
+            text = [ 'Te mostramos las opciones de gestión de tu alarma.', '', 'Haz clic en una o {}'.format(back_text_suggestion) ]
     menu.append([ back_button ])
     return menu, text
 
@@ -172,13 +199,15 @@ async def get_cameras_menu(user, chat, data):
     back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('cameras-menu', data)
     menu, text = [], [ 'No tienes permiso para acceder a esta funcionalidad.', '', back_text_suggestion.capitalize() ]
     if await is_user_allowed_to_exec_administrative_commands(user):
-        cameras = []
-        if 'devices' in config.CAMERAS:
-            for camera_id in config.CAMERAS['devices'].keys():
-                cameras.append({ 'id': camera_id, 'name': config.CAMERAS['devices'][camera_id]['name'] })
+        text = ['Se ha restringido el acceso a esta funcionalidad en el archivo de configuración.', '', back_text_suggestion.capitalize()]
+        if config_block_exists('CAMERAS'):
+            cameras = []
+            if 'devices' in config.CAMERAS:
+                for camera_id in config.CAMERAS['devices'].keys():
+                    cameras.append({ 'id': camera_id, 'name': config.CAMERAS['devices'][camera_id]['name'] })
             for camera_data in sorted(cameras, key = lambda camera_data: camera_data['name']):
                 menu.append([ InlineKeyboardButton(camera_data['name'], callback_data = get_callback_data('camera-menu', action_modifiers = { 'camera-id': camera_data['id'] }, current_callback_data = data)) ])
-        text = [ 'A continuación se muestra la lista de cámaras.', '', 'Haz clic en la ubicación de una de ellas para ver las opciones disponibles o {}'.format(back_text_suggestion) ] if len(menu) > 0 else [ 'No hay cámaras disponibles.', '', back_text_suggestion.capitalize() ]
+            text = [ 'Te mostramos la lista de cámaras.', '', 'Haz clic en la ubicación de cualquiera de ellas para ver las opciones disponibles o {}'.format(back_text_suggestion) ] if len(menu) > 0 else [ 'No hay cámaras disponibles.', '', back_text_suggestion.capitalize() ]
     menu.append([ back_button ])
     return menu, text
 
@@ -186,10 +215,12 @@ async def get_camera_menu(user, chat, data):
     back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('camera-menu', data)
     menu, text = [], [ 'No tienes permiso para acceder a esta funcionalidad.', '', back_text_suggestion.capitalize() ]
     if await is_user_allowed_to_exec_administrative_commands(user):
-        camera_data = config.CAMERAS['devices'][data['camera-id']] if ('devices' in config.CAMERAS) and (data['camera-id'] in config.CAMERAS['devices']) else None
-        if camera_data is not None:
-            menu.append([ InlineKeyboardButton('Reiniciar la cámara', callback_data = get_callback_data('interact-with-a-camera', action_modifiers = { 'camera-id': data['camera-id'], 'command': 'restart' }, current_callback_data = data)) ])
-        text = [ 'La dirección IP asociada a la cámara "{}" es la "{}.".'.format(camera_data['name'], camera_data['ip']), '', 'Haz clic sobre la acción a ejecutar o {}'.format(back_text_suggestion) ] if camera_data is not None else [ 'La cámara especificada no se encuentra.', '', back_text_suggestion.capitalize() ]
+        text = [ 'Se ha restringido el acceso a esta funcionalidad en el archivo de configuración.', '', back_text_suggestion.capitalize() ]
+        if config_block_exists('CAMERAS'):
+            camera_data = config.CAMERAS['devices'][data['camera-id']] if ('devices' in config.CAMERAS) and (data['camera-id'] in config.CAMERAS['devices']) else None
+            if camera_data is not None:
+                menu.append([ InlineKeyboardButton('Reiniciar la cámara', callback_data = get_callback_data('interact-with-a-camera', action_modifiers = { 'camera-id': data['camera-id'], 'command': 'restart' }, current_callback_data = data)) ])
+            text = [ 'La dirección IP asociada a la cámara "{}" es la "{}.".'.format(camera_data['name'], camera_data['ip']), '', 'Haz clic sobre la acción a ejecutar o {}'.format(back_text_suggestion) ] if camera_data is not None else [ 'La cámara que has indicado no existe o no es accesible para este bot.', '', back_text_suggestion.capitalize() ]
     menu.append([ back_button ])
     return menu, text
 
@@ -197,29 +228,49 @@ async def get_dockers_menu(user, chat, data):
     back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('dockers-menu', data)
     menu, text = [], [ 'No tienes permiso para acceder a esta funcionalidad.', '', back_text_suggestion.capitalize() ]
     if await is_user_allowed_to_exec_administrative_commands(user):
-        for container in sorted(DockerUtils.get_containers(True), key = lambda container: container.name):
-            menu.append([ InlineKeyboardButton(container.name, callback_data = get_callback_data('docker-menu', action_modifiers = { 'docker-id': container.id }, current_callback_data = data)) ])
-        text = [ 'A continuación se muestra la lista de contenedores.', '', 'Haz clic en el nombre de uno de ellos para ver las opciones disponibles o {}'.format(back_text_suggestion) ]
-    menu.append([ InlineKeyboardButton('Recargar', callback_data = get_callback_data('dockers-menu', current_callback_data = data)), back_button ])
+        text = [ 'Se ha restringido el acceso a esta funcionalidad en el archivo de configuración.', '', back_text_suggestion.capitalize() ]
+        if config_block_exists('DOCKERS'):
+            for container in sorted(DockerUtils.get_containers(True), key = lambda container: container.name):
+                menu.append([ InlineKeyboardButton(container.name, callback_data = get_callback_data('docker-menu', action_modifiers = { 'docker-id': container.id }, current_callback_data = data)) ])
+            text = [ 'Te mostramos la lista de contenedores.', '', 'Haz clic en el nombre de cualquiera de ellos para ver las opciones disponibles o {}'.format(back_text_suggestion) ]
+            menu.append([ InlineKeyboardButton('Recargar', callback_data = get_callback_data('dockers-menu', current_callback_data = data)), back_button ])
+    if len(menu) == 0:
+        menu.append([ back_button ])
     return menu, text
 
 async def get_docker_menu(user, chat, data):
     back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('docker-menu', data)
     menu, text = [], [ 'No tienes permiso para acceder a esta funcionalidad.', '', back_text_suggestion.capitalize() ]
     if await is_user_allowed_to_exec_administrative_commands(user):
-        text = [ 'El contenedor indicado no se encuentra.', '', back_text_suggestion.capitalize() ]
-        if DockerUtils.container_exists(data['docker-id']):
-            name, is_running = DockerUtils.get_container_name(data['docker-id']), DockerUtils.is_container_running(data['docker-id'])
-            if is_running:
-                menu.append([ InlineKeyboardButton(DOCKER_ACTIONS['stop']['title'], callback_data = get_callback_data('interact-with-a-docker', action_modifiers = { 'docker-id': data['docker-id'], 'command': 'stop' }, current_callback_data = data)) ])
-                menu.append([ InlineKeyboardButton(DOCKER_ACTIONS['restart']['title'], callback_data = get_callback_data('interact-with-a-docker', action_modifiers = { 'docker-id': data['docker-id'], 'command': 'restart' }, current_callback_data = data)) ])
-            else:
-                menu.append([ InlineKeyboardButton(DOCKER_ACTIONS['start']['title'], callback_data = get_callback_data('interact-with-a-docker', action_modifiers = { 'docker-id': data['docker-id'], 'command': 'start' }, current_callback_data = data)) ])
-                menu.append([ InlineKeyboardButton(DOCKER_ACTIONS['delete']['title'], callback_data = get_callback_data('interact-with-a-docker', action_modifiers = { 'docker-id': data['docker-id'], 'command': 'delete' }, current_callback_data = data)) ])
-            text = [ 'El contenedor "{}" {}.'.format(name, 'se está ejecutando' if is_running else 'no se está ejecutando'), '', 'Haz clic sobre la opción deseada o {}'.format(back_text_suggestion) ]
+        text = [ 'Se ha restringido el acceso a esta funcionalidad en el archivo de configuración.', '', back_text_suggestion.capitalize() ]
+        if config_block_exists('DOCKERS'):
+            text = [ 'El contenedor indicado no se encuentra.', '', back_text_suggestion.capitalize() ]
+            if DockerUtils.container_exists(data['docker-id']):
+                name, is_running = DockerUtils.is_container_running(data['docker-id']), DockerUtils.is_container_running(data['docker-id'])
+                if is_running:
+                    menu.append([ InlineKeyboardButton(DOCKER_ACTIONS['stop']['title'], callback_data = get_callback_data('interact-with-a-docker', action_modifiers = { 'docker-id': data['docker-id'], 'command': 'stop' }, current_callback_data = data)) ])
+                    menu.append([ InlineKeyboardButton(DOCKER_ACTIONS['restart']['title'], callback_data = get_callback_data('interact-with-a-docker', action_modifiers = { 'docker-id': data['docker-id'], 'command': 'restart' }, current_callback_data = data)) ])
+                else:
+                    menu.append([ InlineKeyboardButton(DOCKER_ACTIONS['start']['title'], callback_data = get_callback_data('interact-with-a-docker', action_modifiers = { 'docker-id': data['docker-id'], 'command': 'start' }, current_callback_data = data)) ])
+                    menu.append([ InlineKeyboardButton(DOCKER_ACTIONS['delete']['title'], callback_data = get_callback_data('interact-with-a-docker', action_modifiers = { 'docker-id': data['docker-id'], 'command': 'delete' }, current_callback_data = data)) ])
+                text = [ 'El contenedor "{}" {}.'.format(name, 'se está ejecutando' if is_running else 'no se está ejecutando'), '', 'Haz clic sobre la opción deseada o {}'.format(back_text_suggestion) ]
     menu.append([ back_button ])
     return menu, text
-           
+
+async def get_vpn_menu(user, chat, data):
+    back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('vpn-menu', data)
+    menu, text = [], [ 'No tienes permiso para acceder a esta funcionalidad.', '', back_text_suggestion.capitalize() ]
+    if await is_user_allowed_to_exec_administrative_commands(user):
+        text = [ 'Se ha restringido el acceso a esta funcionalidad en el archivo de configuración.', '', back_text_suggestion.capitalize() ]
+        if config_block_exists('VPN'):
+            if 'type' in config.VPN:
+                if config.VPN['type'] == 'docker' and 'docker' in config.VPN:
+                    is_running = DockerUtils.is_container_running(config.VPN['docker'])
+                    menu.append([ InlineKeyboardButton('Apagar' if is_running else 'Encender', callback_data = get_callback_data('interact-with-the-vpn', action_modifiers = { 'command': 'stop' if is_running else 'start' }, current_callback_data = data)) ])
+                    text = [ 'La VPN está {}.'.format('encendida' if is_running else 'apagada'), '', 'Haz clic sobre la opción deseada o {}'.format(back_text_suggestion) ]
+    menu.append([ back_button ])
+    return menu, text
+
 async def _menu(update, context, data):
     user, chat = get_effective_user(update), get_effective_chat(update)
     menu, text = [], []
@@ -238,15 +289,11 @@ async def _menu(update, context, data):
         menu, text = await get_dockers_menu(user, chat, data)
     elif data['action'] == 'docker-menu':
         menu, text = await get_docker_menu(user, chat, data)
-    if update.callback_query:
-        await callback_query_answer(update)
-        await update.callback_query.message.edit_text("\n".join(text), parse_mode = ParseMode.HTML, reply_markup = InlineKeyboardMarkup(menu))
-    else:
-        message = await update.effective_chat.send_message("\n".join(text), parse_mode = ParseMode.HTML, reply_markup = InlineKeyboardMarkup(menu), disable_notification = True)
-        if not message.chat.id in BOT_MESSAGES:
-            BOT_MESSAGES[message.chat.id] = {}
-        BOT_MESSAGES[message.chat.id][message.id] = True 
-    
+    elif data['action'] == 'vpn-menu':
+        menu, text = await get_vpn_menu(user, chat, data)
+    await callback_query_answer(update)
+    await send_menu_message(update, text, menu)
+
 ##### Puntos de entrada de los diferentes menús
 
 async def menu(update, context):
@@ -256,7 +303,7 @@ async def menu(update, context):
 
 async def alarm_menu(update, context):
     await update.message.delete()
-    if len(context.args) != 0:
+    if config_block_exists('ALARMO') and len(context.args) != 0:
         arm_mode = ' '.join(context.args).strip()
         if 'arm-modes-synonyms' in config.ALARMO and arm_mode in config.ALARMO['arm-modes-synonyms']:
             arm_mode = config.ALARMO['arm-modes-synonyms'][arm_mode]
@@ -272,6 +319,10 @@ async def dockers_menu(update, context):
     await update.message.delete()
     await _menu(update, context, { 'action': 'dockers-menu', 'root-menu': 'dockers-menu' })
 
+async def vpn_menu(update, context):
+    await update.message.delete()
+    await _menu(update, context, { 'action': 'vpn-menu', 'root-menu': 'vpn-menu' })
+
 def is_menu_request(data):
     return isinstance(data, dict) and 'action' in data and data['action'].endswith('-menu')
 
@@ -280,7 +331,7 @@ def is_menu_request(data):
 async def list_commands(update, context):
     messages = {
         '': [
-            'A continuación presentamos la lista de comandos disponibles:',
+            'A continuación enumeramos los comandos disponibles:',
             '',
             '<u>General</u>',
             '',
@@ -304,64 +355,137 @@ async def list_commands(update, context):
             '',
             '<b>/dockers</b> : Muestra el menú de dockers',
         ],
+        'vpn': [
+            '<u>Gestión de la VPN:</u>',
+            '',
+            '<b>/vpn</b> : Muestra el menú de la VPN',
+            '',
+            '<b>/vpn on</b> : Enciende la VPN',
+            '<b>/vpn off</b> : Apaga la VPN',
+        ],
     }
-    if 'arm-modes' in config.ALARMO:
-        messages['alarm'].append('')
-        for arm_mode in config.ALARMO['arm-modes']:
-            messages['alarm'].append('<b>/alarm {}</b> : Conecta la alarma en modo "{}"'.format(arm_mode, _get_alarm_mode_name(arm_mode)))
-        messages['alarm'].append('')
-        if 'arm-modes-synonyms' in config.ALARMO:
-            for arm_mode in config.ALARMO['arm-modes-synonyms'].keys():
-                messages['alarm'].append('<b>/alarm {}</b> : Conecta la alarma en modo "{}"'.format(arm_mode, _get_alarm_mode_name(config.ALARMO['arm-modes-synonyms'][arm_mode])))
-    text = "\n".join(messages['']) + "\n\n" + "\n".join(messages['alarm'])
+    text = "\n".join(messages[''])
+    if config_block_exists('ALARMO'):
+        if 'arm-modes' in config.ALARMO:
+            messages['alarm'].append('')
+            for arm_mode in config.ALARMO['arm-modes']:
+                messages['alarm'].append('<b>/alarm {}</b> : Conecta la alarma en modo "{}"'.format(arm_mode, _get_alarmo_arm_mode_name(arm_mode)))
+            messages['alarm'].append('')
+            if 'arm-modes-synonyms' in config.ALARMO:
+                for arm_mode in config.ALARMO['arm-modes-synonyms'].keys():
+                    messages['alarm'].append('<b>/alarm {}</b> : Conecta la alarma en modo "{}"'.format(arm_mode, _get_alarmo_arm_mode_name(config.ALARMO['arm-modes-synonyms'][arm_mode])))
+        text += "\n\n" + "\n".join(messages['alarm'])
     user, chat = get_effective_user(update), get_effective_chat(update)
     if await is_user_allowed_to_exec_administrative_commands(user):
-        if 'devices' in config.CAMERAS:
+        if config_block_exists('CAMERAS') and 'devices' in config.CAMERAS:
             messages['cameras'].append('')
             for camera_id in config.CAMERAS['devices']:
                 messages['cameras'].append('<b>/camera {} {}</b> : Reinicia la cámara "{}"'.format(camera_id, 'restart', config.CAMERAS['devices'][camera_id]['name']))
             text += "\n\n" + "\n".join(messages['cameras'])
-        text += "\n\n" + "\n".join(messages['dockers'])
+        if config_block_exists('DOCKERS'):
+            text += "\n\n" + "\n".join(messages['dockers'])
+        if config_block_exists('VPN'):
+            text += "\n\n" + "\n".join(messages['vpn'])
     await update.message.delete()
     await update.effective_chat.send_message(text, parse_mode = ParseMode.HTML, disable_notification = True)
+
+##### Confirma una acción antes de ejecutarla
+
+def _is_confirmed(config_ref, name, data):
+    return ('bypassed-confirmations' in config_ref and name in config_ref['bypassed-confirmations'] and config_ref['bypassed-confirmations'][name]) or ('action-confirmed' in data) 
+    
+async def _confirm(update, description, data):
+    delete_message = False if update.callback_query else True
+    text = [ 'Por favor, confirma que realmente quieres {}'.format(description) if description is not None else '¿Estás seguro?' ]
+    menu = [ [ InlineKeyboardButton('Sí', callback_data = get_callback_data('indirect-action', action_modifiers = { 'delete-message': delete_message, 'data': get_callback_data(data['action'], action_modifiers = data) })) ], [ InlineKeyboardButton('No', callback_data = get_callback_data('indirect-action', action_modifiers = { 'delete-message': delete_message, 'caller': data['action'], 'data': get_callback_data('show-menu', action_modifiers = data) })) ] ]
+    await send_menu_message(update, text, menu)
+
+async def _indirect_action(update, context, data):
+    if 'delete-message' in data and data['delete-message']:
+        await delete_menu_message(update.callback_query.message)
+    if 'data' in data:
+        caller = data['caller'] if 'caller' in data else None
+        data = data['data']
+        if 'action' in data:
+            if data['action'] == 'show-menu':
+                if caller == 'set-alarm-arm-mode':
+                    data['action'] = 'alarm-menu'
+                elif caller == 'interact-with-a-camera':
+                    data['action'] = 'camera-menu'
+                elif caller == 'interact-with-a-docker':
+                    data['action'] = 'docker-menu'
+                elif caller == 'interact-with-the-vpn':
+                    data['action'] = 'vpn-menu'
+                if data['action'] != 'show-menu' and 'root-menu' in data:
+                    await _menu(update, context, data)
+            else:
+                data['action-confirmed'] = True
+                if data['action'] == 'set-alarm-arm-mode':
+                    await _set_alarm_arm_mode(update, context, data)
+                elif data['action'] == 'interact-with-a-camera':
+                    await _interact_with_a_camera(update, context, data)
+                elif data['action'] == 'interact-with-a-docker':
+                    await _interact_with_a_docker(update, context, data)
+                elif data['action'] == 'interact-with-the-vpn':
+                    await _interact_with_the_vpn(update, context, data)
+
+async def indirect_action(update, context):
+    await _indirect_action(update, context, update.callback_query.data)
+
+def is_indirect_action_request(data):
+    return isinstance(data, dict) and 'action' in data and data['action'] == 'indirect-action'
 
 ##### Interacción con la alarma
 
 async def _set_alarm_arm_mode(update, context, data):
-    if 'arm-mode' in data and is_user_allowed_to_interact_with_the_chat(get_effective_user(update), get_effective_chat(update)) and AlarmoUtils.can_change_state():
+    callback_query_answer_done = False
+    if 'arm-mode' in data and config_block_exists('ALARMO') and is_user_allowed_to_interact_with_the_chat(get_effective_user(update), get_effective_chat(update)) and AlarmoUtils.can_change_state():
         arm_mode = data['arm-mode']
         if arm_mode in ALARMO_ACTIONS:
             command, state = ALARMO_ACTIONS[arm_mode]['command'], ALARMO_ACTIONS[arm_mode]['state']
-            message = await update.effective_chat.send_message('Espera mientras tratamos de acceder a la alarma para desarmarla.' if arm_mode == 'disarm' else 'Espera mientras tratamos de acceder a la alarma para configurarla en modo "{}".'.format(_get_alarm_mode_name(arm_mode)), disable_notification = True)
-            success = AlarmoUtils.send_command(command, state)
-            await message.delete()
-            if success and 'root-menu' in data:
-                await _menu(update, context, { 'action': 'alarm-menu', 'root-menu': data['root-menu'] })
-            elif update.callback_query:
+            if _is_confirmed(config.ALARMO, arm_mode, data):
+                message = await update.effective_chat.send_message('Espera mientras tratamos de acceder a la alarma para desarmarla.' if arm_mode == 'disarm' else 'Espera mientras tratamos de acceder a la alarma para configurarla en modo "{}".'.format(_get_alarmo_arm_mode_name(arm_mode)), disable_notification = True)
+                success = AlarmoUtils.send_command(command, state)
+                await message.delete()
+                if success and 'root-menu' in data:
+                    await _menu(update, context, { 'action': 'alarm-menu', 'root-menu': data['root-menu'] })
                 await callback_query_answer(update)
+                callback_query_answer_done = True
+            else:
+                await callback_query_answer(update)
+                callback_query_answer_done = True
+                await _confirm(update, 'desarmar la alarma' if arm_mode == 'disarm' else 'configurar la alarma en modo "{}"'.format(_get_alarmo_arm_mode_name(arm_mode)), data)
+    if not callback_query_answer_done:
+        await callback_query_answer(update)
 
 async def set_alarm_arm_mode(update, context):
-    data = update.callback_query.data
-    await _set_alarm_arm_mode(update, context, data)
+    await _set_alarm_arm_mode(update, context, update.callback_query.data)
 
 def is_set_alarm_arm_mode_request(data):
     return isinstance(data, dict) and 'action' in data and data['action'] == 'set-alarm-arm-mode'
 
-# Interacción con una cámara
+##### Interacción con una cámara
 
 async def _interact_with_a_camera(update, context, data):
-    if 'camera-id' in data and 'command' in data:
-        if await is_user_allowed_to_exec_administrative_commands(get_effective_user(update)):
-            camera_data = config.CAMERAS['devices'][data['camera-id']] if 'devices' in config.CAMERAS and data['camera-id'] in config.CAMERAS['devices'] else None
-            if camera_data is not None:
-                if 'oems' in config.CAMERAS and 'oem' in camera_data and camera_data['oem'] in config.CAMERAS['oems']:
-                    if data['command'] == 'restart':
+    callback_query_answer_done = False
+    if 'camera-id' in data and 'command' in data and config_block_exists('CAMERAS') and await is_user_allowed_to_exec_administrative_commands(get_effective_user(update)):
+        camera_data = config.CAMERAS['devices'][data['camera-id']] if 'devices' in config.CAMERAS and data['camera-id'] in config.CAMERAS['devices'] else None
+        if camera_data is not None:
+            if 'oems' in config.CAMERAS and 'oem' in camera_data and camera_data['oem'] in config.CAMERAS['oems']:
+                if data['command'] == 'restart':
+                    if _is_confirmed(config.CAMERAS, data['command'], data):
                         message = await update.effective_chat.send_message('Espera mientras tratamos de acceder a la cámara para reiniciarla.', disable_notification = True)
                         camera_oem = config.CAMERAS['oems'][camera_data['oem']]
                         CameraUtils.restart(camera_data['oem'], camera_data['ip'], camera_oem['user'], camera_oem['password'])
                         await message.delete()
-                        if update.callback_query:
-                            await callback_query_answer(update)
+                        await callback_query_answer(update)
+                        callback_query_answer_done = True
+                    else:
+                        await callback_query_answer(update)
+                        callback_query_answer_done = True
+                        await _confirm(update, 'reiniciar la cámara "{}"'.format(camera_data['name']), data)
+    if not callback_query_answer_done:
+        await callback_query_answer(update)
 
 async def interact_with_a_camera(update, context):
     await _interact_with_a_camera(update, context, update.callback_query.data)
@@ -369,57 +493,119 @@ async def interact_with_a_camera(update, context):
 def is_interact_with_a_camera_request(data):
     return isinstance(data, dict) and 'action' in data and data['action'] == 'interact-with-a-camera';
 
-# Interacción con una cámara
+##### Interacción con una cámara
 
 async def handle_camera_command(update, context):
     await update.message.delete()
     if len(context.args) == 1:
         await _menu(update, context, { 'action': 'camera-menu', 'camera-id': context.args[0], 'root-menu': 'camera-menu' })
     elif len(context.args) == 2:
-        await interact_with_a_camera(upate, context, { 'camera-id': context.args[0], 'command': context.args[1] })
+        await _interact_with_a_camera(update, context, { 'action': 'interact-with-a-camera', 'camera-id': context.args[0], 'command': context.args[1] })
     else:
         await _menu(update, context, { 'action': 'cameras-menu', 'root-menu': 'cameras-menu' })
     
 ##### Interacción con un docker
 
+async def _interact_with_a_docker(update, context, data):
+    callback_query_answer_done = False
+    if 'command' in data and 'docker-id' in data and data['command'] in DOCKER_ACTIONS and config_block_exists('DOCKERS') and await is_user_allowed_to_exec_administrative_commands(get_effective_user(update)):
+        name = DockerUtils.get_container_name(data['docker-id'])
+        if _is_confirmed(config.DOCKERS, data['command'], data):
+            message = await update.effective_chat.send_message('Espera mientras tratamos de acceder a "{}" para {}.'.format(name, DOCKER_ACTIONS[data['command']]['action']), disable_notification = True)
+            if data['command'] == 'delete':
+                DockerUtils.delete_container(data['docker-id'])
+                if not DockerUtils.container_exists(data['docker-id']) and 'root-menu' in data:
+                    data['action'] = 'dockers-menu'
+                    await _menu(update, context, data)
+            else:
+                is_running = DockerUtils.is_container_running(data['docker-id'])
+                if data['command'] == 'start':
+                    DockerUtils.start_container(data['docker-id'])
+                elif data['command'] == 'stop':
+                    DockerUtils.stop_container(data['docker-id'])
+                elif data['command'] == 'restart':
+                    DockerUtils.restart_container(data['docker-id'])
+                if DockerUtils.is_container_running(data['docker-id']) != is_running and 'root-menu' in data:
+                    data['action'] = 'docker-menu'
+                    await _menu(update, context, data)
+            await message.delete()
+            await callback_query_answer(update)
+            callback_query_answer_done = True
+        else:
+            await callback_query_answer(update)
+            callback_query_answer_done = True
+            await _confirm(update, '{} el contenedor "{}"'.format(DOCKER_ACTIONS[data['command']]['confirm-action'], name), data)
+    if not callback_query_answer_done:
+        await callback_query_answer(update)
+
+
 async def interact_with_a_docker(update, context):
-    data = update.callback_query.data
-    if 'command' in data and 'docker-id' in data:
-        if await is_user_allowed_to_exec_administrative_commands(get_effective_user(update)):
-            if data['command'] in DOCKER_ACTIONS:
-                message = await update.effective_chat.send_message('Espera mientras tratamos de acceder al contenedor para {}.'.format(DOCKER_ACTIONS[data['command']]['action']), disable_notification = True)
-                if data['command'] == 'delete':
-                    DockerUtils.delete_container(data['docker-id'])
-                    if not DockerUtils.container_exists(data['docker-id']):
-                        data['action'] = 'dockers-menu'
-                        await _menu(update, context, data)
-                else:
-                    is_running = DockerUtils.is_container_running(data['docker-id'])
-                    if data['command'] == 'start':
-                        DockerUtils.start_container(data['docker-id'])
-                    elif data['command'] == 'stop':
-                        DockerUtils.stop_container(data['docker-id'])
-                    elif data['command'] == 'restart':
-                        DockerUtils.restart_container(data['docker-id'])
-                    if DockerUtils.is_container_running(data['docker-id']) != is_running:
-                        data['action'] = 'docker-menu'
-                        await _menu(update, context, data)
-                await message.delete()
-                if update.callback_query:
-                    await callback_query_answer(update)
+    await _interact_with_a_docker(update, context, update.callback_query.data)
 
 def is_interact_with_a_docker_request(data):
     return isinstance(data, dict) and 'action' in data and data['action'] == 'interact-with-a-docker';
 
+##### Interacción con la VPN
+
+async def _interact_with_the_vpn(update, context, data):
+    callback_query_answer_done = False
+    if 'command' in data and data['command'] in [ 'start', 'stop' ] and config_block_exists('VPN') and await is_user_allowed_to_exec_administrative_commands(get_effective_user(update)):
+        if 'type' in config.VPN:
+            if config.VPN['type'] == 'docker' and 'docker' in config.VPN:
+                if _is_confirmed(config.VPN, data['command'], data):
+                    is_running, will_be_run = DockerUtils.is_container_running(config.VPN['docker']), data['command'] == 'start'
+                    message = None
+                    if is_running != will_be_run:
+                        message = await update.effective_chat.send_message('Espera mientras tratamos de acceder a la VPN para {}.'.format('encenderla' if data['command'] == 'start' else 'apagarla'), disable_notification = True)
+                        if data['command'] == 'start':
+                            DockerUtils.start_container(config.VPN['docker'])
+                        else:
+                            DockerUtils.stop_container(config.VPN['docker'])
+                    if DockerUtils.is_container_running(config.VPN['docker']) == will_be_run and not 'root-menu' in data:
+                        if message != None:
+                            await message.delete()
+                        message = await update.effective_chat.send_message('La VPN ya está {}.'.format('encendida' if data['command'] == 'start' else 'apagada'), disable_notification = True)
+                        sleep(5)
+                    await message.delete()
+                    await callback_query_answer(update)
+                    if 'root-menu' in data:
+                        data['action'] = 'vpn-menu'
+                        await _menu(update, context, data)
+                    callback_query_answer_done = True
+                else:
+                    await callback_query_answer(update)
+                    callback_query_answer_done = True
+                    await _confirm(update, '{} la VPN"'.format('encender' if data['command'] == 'start' else 'apagar'), data)
+    if not callback_query_answer_done:
+        await callback_query_answer(update)
+
+async def interact_with_the_vpn(update, context):
+    await _interact_with_the_vpn(update, context, update.callback_query.data)
+
+def is_interact_with_the_vpn_request(data):
+    return isinstance(data, dict) and 'action' in data and data['action'] == 'interact-with-the-vpn';
+
+##### Interacción con una cámara
+
+async def handle_vpn_command(update, context):
+    await update.message.delete()
+    if len(context.args) == 1 and context.args[0] in [ 'on', 'off' ]:
+        await _interact_with_the_vpn(update, context, { 'action': 'interact-with-the-vpn', 'command': 'start' if context.args[0] == 'on' else 'stop' })
+    else:
+        await _menu(update, context, { 'action': 'vpn-menu', 'root-menu': 'vpn-menu' })
+
 ##### Obtener la IP pública del router
 
 async def _whats_my_ip(update, context):
+    callback_query_answer_done = False
     if is_user_allowed_to_interact_with_the_chat(get_effective_user(update), get_effective_chat(update)):
-        message = await update.effective_chat.send_message('Espera mientras tratamos de obtener la dirección pública del router.')
+        message = await update.effective_chat.send_message('Espera un momento mientras tratamos de obtener la dirección IP pública del router.')
         ip = WhatsMyIp.get()
         await message.edit_text('La dirección IP del router es la "{}"'.format(ip) if ip is not None else 'No se ha podido obtener la dirección IP del router')
-        if update.callback_query:
-            await callback_query_answer(update)
+        await callback_query_answer(update)
+        callback_query_answer_done = True
+    if not callback_query_answer_done:
+        await callback_query_answer(update)
 
 async def whats_my_ip(update, context):
     await _whats_my_ip(update, context)
@@ -436,9 +622,7 @@ async def handle_whats_my_ip_command(update, context):
 async def exit_menu(update, context):
     await callback_query_answer(update)
     message = update.callback_query.message
-    await message.delete()
-    if message.chat.id in BOT_MESSAGES and message.id in BOT_MESSAGES[message.chat.id]:
-        BOT_MESSAGES[message.chat.id].pop(message.id)
+    await delete_menu_message(message)
 
 def is_exit_menu_request(data):
     return isinstance(data, dict) and 'action' in data and data['action'] == 'exit';
@@ -462,7 +646,7 @@ async def handle_invalid_button(update, context):
 
 async def post_init(application):
     BOT_MESSAGES.clear()
-    await application.bot.set_my_commands([ BotCommand('alarm', 'para visualizar las opciones de la alarma.'), BotCommand('cameras', 'para visualizar las opciones de gestión de cámaras.'), BotCommand('commands', 'para visualizar la lista de comandos disponibles.'), BotCommand('dockers', 'para visualizar las opciones de gestión de contenedores.'), BotCommand('menu', 'para visualizar el menú del bot.'), BotCommand('whatsmyip', 'para visualizar la dirección IP pública del router.') ])
+    await application.bot.set_my_commands([ BotCommand('alarm', 'para visualizar las opciones de la alarma.'), BotCommand('cameras', 'para visualizar las opciones de gestión de cámaras.'), BotCommand('commands', 'para visualizar la lista de comandos disponibles.'), BotCommand('dockers', 'para visualizar las opciones de gestión de contenedores.'), BotCommand('vpn', 'para visualizar las opciones de gestión de la VPN'), BotCommand('menu', 'para visualizar el menú del bot.'), BotCommand('whatsmyip', 'para visualizar la dirección IP pública del router.') ])
 
 async def post_stop(application): 
     for chat_id in BOT_MESSAGES:
@@ -483,11 +667,14 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler('cameras', cameras_menu))
     application.add_handler(CommandHandler('camera', handle_camera_command))
     application.add_handler(CommandHandler('dockers', dockers_menu))
+    application.add_handler(CommandHandler('vpn', handle_vpn_command))
     application.add_handler(CommandHandler('whatsmyip', handle_whats_my_ip_command))
     application.add_handler(CallbackQueryHandler(menu, pattern = is_menu_request))
     application.add_handler(CallbackQueryHandler(set_alarm_arm_mode, pattern = is_set_alarm_arm_mode_request))
     application.add_handler(CallbackQueryHandler(interact_with_a_camera, pattern = is_interact_with_a_camera_request))
     application.add_handler(CallbackQueryHandler(interact_with_a_docker, pattern = is_interact_with_a_docker_request))
+    application.add_handler(CallbackQueryHandler(interact_with_the_vpn, pattern = is_interact_with_the_vpn_request))
+    application.add_handler(CallbackQueryHandler(indirect_action, pattern = is_indirect_action_request))
     application.add_handler(CallbackQueryHandler(whats_my_ip, pattern = is_whats_my_ip_request))
     application.add_handler(CallbackQueryHandler(exit_menu, pattern = is_exit_menu_request))
     application.add_handler(CallbackQueryHandler(handle_invalid_button, pattern = InvalidCallbackData))

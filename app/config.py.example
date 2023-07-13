@@ -33,8 +33,7 @@ ALARMO = {
         'state': 'alarmo/state',                                
         'command': 'alarmo/command',
     },
-    'arm-modes': [ 'arm-home', 'arm-away' ],                    # Los modos de alarma que se pueden configurar desde /alarms (no introducir "disarm")
-                                                                # Se soporta: arm-home, arm-away, arm-night y arm-vacation
+    'arm-modes': [ 'arm-home', 'arm-away' ],                    # Los modos de alarma que se pueden configurar desde /alarm (se soportan arm-home, arm-away, arm-night y arm-vacation) 
     'arm-modes-synonyms': {                                     # Palabras clave para usar en /alarms [arm_mode] en lugar de las palabras indicadas en "arm-modes" (opcional)
         'home': 'arm-home',
         'away': 'arm-away',
@@ -42,6 +41,11 @@ ALARMO = {
     'arm-modes-names': {                                        # Nombres de los modos de alarma, en minúsculas (opcional)
         'arm-home': 'casa',
         'arm-away': 'fuera de casa'     
+    },
+    'bypassed-confirmations': {
+        'arm-home': False,
+        'arm-away': False,
+        'disarm': False,
     },
 }
     
@@ -58,5 +62,26 @@ CAMERAS = {
             'user': 'USER',                                     # Usuario de acceso a la cámara (es el usuario RSTP que se ha puesto en opciones avanzadas, y si éste no funciona entonces probar "admin")
             'password': 'PASSWORD',                             # Contraseña de acceso a la cámara (es la contraseña del usuario RSTP que se ha puesto en opciones avanzadas, y si ésta no funciona entonces probar la de la cuenta TP-Link)
         },
+    },
+    'bypassed-confirmations': {
+        'restart': False,
+    },
+}
+
+DOCKERS = {
+    'bypassed-confirmations': {
+        'start': False,
+        'stop': False,
+        'restart': False,
+        'delete': False,
+    },
+}
+
+VPN = {
+   'type': 'docker',                                           # El tipo de la VPN. De momento solo ofrecemos soporte para VPN que funcionan en un contenedor.
+   'docker': 'NOMBRE',                                         # El nombre del docker que implementa la VPN.
+    'bypassed-confirmations': {
+        'start': False,
+        'stop': False,
     },
 }
