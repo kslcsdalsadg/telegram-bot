@@ -520,11 +520,11 @@ async def _interact_with_a_docker(update, context, data):
             else:
                 is_running = DockerUtils.is_container_running(data['docker-id'])
                 if data['command'] == 'start':
-                    DockerUtils.start_container(data['docker-id'])
+                    DockerUtils.start_container(data['docker-id'], config.DOCKERS['host-indirection'] if 'host-indirection' in config.DOCKERS else None)
                 elif data['command'] == 'stop':
                     DockerUtils.stop_container(data['docker-id'])
                 elif data['command'] == 'restart':
-                    DockerUtils.restart_container(data['docker-id'])
+                    DockerUtils.restart_container(data['docker-id'], config.DOCKERS['host-indirection'] if 'host-indirection' in config.DOCKERS else None)
                 if DockerUtils.is_container_running(data['docker-id']) != is_running and 'root-menu' in data:
                     data['action'] = 'docker-menu'
                     await _menu(update, context, data)
@@ -558,7 +558,7 @@ async def _interact_with_the_vpn(update, context, data):
                     if is_running != will_be_run:
                         message = await update.effective_chat.send_message('Espera mientras tratamos de acceder a la VPN para {}.'.format('encenderla' if data['command'] == 'start' else 'apagarla'), disable_notification = True)
                         if data['command'] == 'start':
-                            DockerUtils.start_container(config.VPN['docker'])
+                            DockerUtils.start_container(config.VPN['docker'], config.DOCKERS['host-indirection'] if config_block_exists('DOCKERS') and 'host-indirection' in config.DOCKERS else None)
                         else:
                             DockerUtils.stop_container(config.VPN['docker'])
                     if DockerUtils.is_container_running(config.VPN['docker']) == will_be_run and not 'root-menu' in data:

@@ -69,6 +69,8 @@ CAMERAS = {
 }
 
 DOCKERS = {
+    'host-indirection': 'roberto@localhost',                   # Si se define, el comando 'docker-compose' se ejecutará en el user-host descrito en lugar de en el docker/host local
+                                                               # Necesitará añadir la clave del usuario/host en el que se ejecuta el comando al archivo authorized_keys del usuario/host destino
     'bypassed-confirmations': {
         'start': False,
         'stop': False,

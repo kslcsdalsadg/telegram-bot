@@ -63,47 +63,55 @@ class DockerUtils():
         return True
 
     @staticmethod
-    def _get_compose_file(id):
+    def _get_compose_file(id, do_not_check_if_file_exists):
         data = docker.APIClient(base_url = 'unix://var/run/docker.sock').inspect_container(id)
         if ('Config' in data) and ('Labels' in data['Config']) and ('com.docker.compose.project.working_dir' in data['Config']['Labels']) and ('com.docker.compose.project.config_files' in data['Config']['Labels']):
             docker_compose_file = data['Config']['Labels']['com.docker.compose.project.config_files']
             if not docker_compose_file.startswith(data['Config']['Labels']['com.docker.compose.project.working_dir']):
                 docker_compose_file = '%s/%s' % ( data['Config']['Labels']['com.docker.compose.project.working_dir'], docker_compose_file )
-            if os.path.exists(docker_compose_file):
+            if do_not_check_if_file_exists or os.path.exists(docker_compose_file):
                 return docker_compose_file
         return None
 
     @staticmethod
-    def pull_container(id):
+    def _execute_docker_compose_command(docker_compose_file, command, host_indirection, delay_before_return = 0):
+        command = 'docker-compose -f %s %s' % ( docker_compose_file, command )
+        if host_indirection:
+            command = 'ssh %s %s' % ( host_indirection, command )
+        logger.info('Intentando ejecutar un comando de sistema: ' + command)
+        if os.system(command) == 0:
+            if delay_before_return > 0:
+                sleep(delay_before_return)
+            return True
+        return False
+        
+
+    @staticmethod
+    def pull_container(id, host_indirection = None):
         if not DockerUtils.is_container_running(id):
-            docker_compose_file = DockerUtils._get_compose_file(id)
+            docker_compose_file = DockerUtils._get_compose_file(id, host_indirection is not None)
             if docker_compose_file is not None:
-                command = 'docker-compose -f "%s" pull' % ( docker_compose_file )
-                logger.info('Intentando ejecutar un comando de sistema: ' + command)
-                if os.system(command) == 0:
-                    sleep(10)
-                    return True
+                return DockerUtils._execute_docker_compose_command(docker_compose_file, 'pull', host_indirection, 10)
         return False
 
     @staticmethod
-    def start_container(id):
+    def start_container(id, host_indirection = None):
         if not DockerUtils.is_container_running(id):
-            docker_compose_file = DockerUtils._get_compose_file(id)
+            docker_compose_file = DockerUtils._get_compose_file(id, host_indirection is not None)
             if docker_compose_file is not None:
-                command = 'docker-compose -f "%s" up -d' % ( docker_compose_file )
-                logger.info('Intentando ejecutar un comando de sistema: ' + command)
-                if os.system(command) == 0:
+                if DockerUtils._execute_docker_compose_command(docker_compose_file, 'up -d', host_indirection):
                     for i in range(DockerUtils.CONFIG['wait-time-for-container-start']):
                         sleep(1)
                         if DockerUtils.is_container_running(id):
-                            return True
+                            break
+                    return True
             return False
         return True
                     
     @staticmethod
-    def restart_container(id):
+    def restart_container(id, host_indirection = None):
         if DockerUtils.stop_container(id):
-            return DockerUtils.start_container(id)
+            return DockerUtils.start_container(id, host_indirection)
         return False
 
     @staticmethod
