@@ -1,7 +1,8 @@
 from telegram import Update, ChatMember, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.constants import ParseMode, ChatType
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, InvalidCallbackData, ChatMemberHandler
-from time import sleep
+from datetime import datetime
+from time import sleep, time
 
 from utils.docker import DockerUtils
 from utils.mqtt import MqttAgent
@@ -643,7 +644,7 @@ async def handle_whats_my_ip_command(update, context):
 async def _uptime(update, context):
     callback_query_answer_done = False
     if is_user_allowed_to_interact_with_the_chat(get_effective_user(update), get_effective_chat(update)):
-        message = await update.effective_chat.send_message('La máquina lleva funcionando {}'.format(get_uptime(True)))
+        message = await update.effective_chat.send_message('La máquina lleva funcionando desde las {} ({})'.format(datetime.fromtimestamp(time() - get_uptime(False)).strftime('%H:%M:%S del %d/%m/%Y'), get_uptime(True)))
         await callback_query_answer(update)
         callback_query_answer_done = True
     if not callback_query_answer_done:
