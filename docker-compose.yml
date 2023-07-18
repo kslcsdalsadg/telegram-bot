@@ -7,10 +7,10 @@ services:
         dockerfile: Dockerfile
       container_name: telegram-bot
       volumes:
+        - /etc/localtime:/etc/localtime:ro    
         - app/bot.py:/app/bot.py:ro
         - app/config.py:/app/config.py:ro
         - app/utils:/app/utils:ro
-        
         - /var/run/docker.sock:/var/run/docker.sock
       restart: unless-stopped 
 
