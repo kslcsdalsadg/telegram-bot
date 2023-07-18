@@ -43,6 +43,25 @@ logger = logging.getLogger(__name__)
 def config_block_exists(name):
     return hasattr(config, name)
 
+def get_uptime(get_as_string):
+    with open('/proc/uptime', 'r') as file:
+        uptime_seconds = float(file.readline().split()[0])
+    if not get_as_string:    
+        return uptime_seconds  
+    a_day, a_hour, a_minute = 24 * 60 * 60, 60 * 60, 60
+    uptimes = []
+    uptimes.append({ 'value': int(uptime_seconds / a_day), 'description_one': 'día', 'description_other': 'días' })
+    uptime_seconds = int(uptime_seconds % a_day)
+    uptimes.append({ 'value': int(uptime_seconds / a_hour), 'description_one': 'hora', 'description_other': 'horas' })
+    uptime_seconds = int(uptime_seconds % a_hour)
+    uptimes.append({ 'value': int(uptime_seconds / a_minute), 'description_one': 'minuto', 'description_other': 'minutos' })
+    uptimes.append({ 'value': int(uptime_seconds % a_minute), 'description_one': 'segundo', 'description_other': 'segundos' })
+    strings = []
+    for i in range(len(uptimes)):
+        if uptimes[i]['value'] or ((i == len(uptimes) - 1) and (len(strings) == 0)):
+            strings.append('{} {}'.format(uptimes[i]['value'], uptimes[i]['description_one'] if uptimes[i]['value'] == 1 else uptimes[i]['description_other']))
+    return " y ".join([", ".join(strings[:-1]), strings[-1]]) if len(strings) > 1 else strings[0] 
+
 ##### Gestión de errores Telegram
 
 async def error_handler(update, context):
@@ -172,6 +191,7 @@ async def get_main_menu(user, chat, data):
         if config_block_exists('VPN'):
             menu.append([InlineKeyboardButton('Gestiona tu VPN', callback_data=get_callback_data('vpn-menu', current_callback_data = data))])
     menu.append([ InlineKeyboardButton('Muestra la IP pública del router', callback_data = get_callback_data('whats-my-ip', current_callback_data = data)) ])
+    menu.append([ InlineKeyboardButton('Muestra el tiempo que lleva funcionando la máquina', callback_data = get_callback_data('uptime', current_callback_data = data)) ])
     text = [ 'Selecciona una opción para continuar o {}'.format(exit_text_suggestion) ]
     menu.append([ exit_button ])
     return menu, text
@@ -337,6 +357,7 @@ async def list_commands(update, context):
             '',
             '<b>/menu</b>: Muestra el menú general',
             '<b>/whatsmyip</b>: Muestra la IP pública del router',
+            '<b>/uptime</b>: Muestra el tiempo que el server lleva funcionando',
         ],
         'alarm': [
             '<u>Gestión de la alarma:</u>',
@@ -617,6 +638,27 @@ async def handle_whats_my_ip_command(update, context):
     await update.message.delete()
     await _whats_my_ip(update, context)
 
+##### Obtener el uptime de la máquina
+
+async def _uptime(update, context):
+    callback_query_answer_done = False
+    if is_user_allowed_to_interact_with_the_chat(get_effective_user(update), get_effective_chat(update)):
+        message = await update.effective_chat.send_message('La máquina lleva funcionando {}'.format(get_uptime(True)))
+        await callback_query_answer(update)
+        callback_query_answer_done = True
+    if not callback_query_answer_done:
+        await callback_query_answer(update)
+
+async def uptime(update, context):
+    await _uptime(update, context)
+
+def is_uptime_request(data):
+    return isinstance(data, dict) and 'action' in data and data['action'] == 'uptime'
+
+async def handle_uptime_command(update, context):
+    await update.message.delete()
+    await _uptime(update, context)
+
 ##### El usuario quiere ocultar el menú
 
 async def exit_menu(update, context):
@@ -646,7 +688,7 @@ async def handle_invalid_button(update, context):
 
 async def post_init(application):
     BOT_MESSAGES.clear()
-    await application.bot.set_my_commands([ BotCommand('alarm', 'para visualizar las opciones de la alarma.'), BotCommand('cameras', 'para visualizar las opciones de gestión de cámaras.'), BotCommand('commands', 'para visualizar la lista de comandos disponibles.'), BotCommand('dockers', 'para visualizar las opciones de gestión de contenedores.'), BotCommand('vpn', 'para visualizar las opciones de gestión de la VPN'), BotCommand('menu', 'para visualizar el menú del bot.'), BotCommand('whatsmyip', 'para visualizar la dirección IP pública del router.') ])
+    await application.bot.set_my_commands([ BotCommand('alarm', 'para visualizar las opciones de la alarma.'), BotCommand('cameras', 'para visualizar las opciones de gestión de cámaras.'), BotCommand('commands', 'para visualizar la lista de comandos disponibles.'), BotCommand('dockers', 'para visualizar las opciones de gestión de contenedores.'), BotCommand('vpn', 'para visualizar las opciones de gestión de la VPN'), BotCommand('menu', 'para visualizar el menú del bot.'), BotCommand('uptime', 'para visualizar el tiempo que lleva en marcha el server.'), BotCommand('whatsmyip', 'para visualizar la dirección IP pública del router.') ])
 
 async def post_stop(application): 
     for chat_id in BOT_MESSAGES:
@@ -669,6 +711,7 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler('dockers', dockers_menu))
     application.add_handler(CommandHandler('vpn', handle_vpn_command))
     application.add_handler(CommandHandler('whatsmyip', handle_whats_my_ip_command))
+    application.add_handler(CommandHandler('uptime', handle_uptime_command))
     application.add_handler(CallbackQueryHandler(menu, pattern = is_menu_request))
     application.add_handler(CallbackQueryHandler(set_alarm_arm_mode, pattern = is_set_alarm_arm_mode_request))
     application.add_handler(CallbackQueryHandler(interact_with_a_camera, pattern = is_interact_with_a_camera_request))
@@ -676,6 +719,7 @@ if __name__ == '__main__':
     application.add_handler(CallbackQueryHandler(interact_with_the_vpn, pattern = is_interact_with_the_vpn_request))
     application.add_handler(CallbackQueryHandler(indirect_action, pattern = is_indirect_action_request))
     application.add_handler(CallbackQueryHandler(whats_my_ip, pattern = is_whats_my_ip_request))
+    application.add_handler(CallbackQueryHandler(uptime, pattern = is_uptime_request))
     application.add_handler(CallbackQueryHandler(exit_menu, pattern = is_exit_menu_request))
     application.add_handler(CallbackQueryHandler(handle_invalid_button, pattern = InvalidCallbackData))
     application.run_polling(allowed_updates = Update.ALL_TYPES)
