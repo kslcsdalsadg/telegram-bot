@@ -267,7 +267,7 @@ async def get_docker_menu(user, chat, data):
         if config_block_exists('DOCKERS'):
             text = [ 'El contenedor indicado no se encuentra.', '', back_text_suggestion.capitalize() ]
             if DockerUtils.container_exists(data['docker-id']):
-                name, is_running = DockerUtils.is_container_running(data['docker-id']), DockerUtils.is_container_running(data['docker-id'])
+                name, is_running = DockerUtils.get_container_name(data['docker-id']), DockerUtils.is_container_running(data['docker-id'])
                 if is_running:
                     menu.append([ InlineKeyboardButton(DOCKER_ACTIONS['stop']['title'], callback_data = get_callback_data('interact-with-a-docker', action_modifiers = { 'docker-id': data['docker-id'], 'command': 'stop' }, current_callback_data = data)) ])
                     menu.append([ InlineKeyboardButton(DOCKER_ACTIONS['restart']['title'], callback_data = get_callback_data('interact-with-a-docker', action_modifiers = { 'docker-id': data['docker-id'], 'command': 'restart' }, current_callback_data = data)) ])
