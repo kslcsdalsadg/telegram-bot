@@ -466,7 +466,7 @@ async def _set_alarm_arm_mode(update, context, data):
         if arm_mode in ALARMO_ACTIONS:
             command, state = ALARMO_ACTIONS[arm_mode]['command'], ALARMO_ACTIONS[arm_mode]['state']
             if _is_confirmed(config.ALARMO, arm_mode, data):
-                message = await update.effective_chat.send_message('Espera mientras tratamos de acceder a la alarma para desarmarla.' if arm_mode == 'disarm' else 'Espera mientras tratamos de acceder a la alarma para configurarla en modo "{}".'.format(_get_alarmo_arm_mode_name(arm_mode)), disable_notification = True)
+                message = await update.effective_chat.send_message('Espera mientras tratamos de acceder a la alarma para desconectarla.' if arm_mode == 'disarm' else 'Espera mientras tratamos de acceder a la alarma para configurarla en modo "{}".'.format(_get_alarmo_arm_mode_name(arm_mode)), disable_notification = True)
                 success = AlarmoUtils.send_command(command, state)
                 await message.delete()
                 if success and 'root-menu' in data:
@@ -476,7 +476,7 @@ async def _set_alarm_arm_mode(update, context, data):
             else:
                 await callback_query_answer(update)
                 callback_query_answer_done = True
-                await _confirm(update, 'desarmar la alarma' if arm_mode == 'disarm' else 'configurar la alarma en modo "{}"'.format(_get_alarmo_arm_mode_name(arm_mode)), data)
+                await _confirm(update, 'desconectar la alarma' if arm_mode == 'disarm' else 'configurar la alarma en modo "{}"'.format(_get_alarmo_arm_mode_name(arm_mode)), data)
     if not callback_query_answer_done:
         await callback_query_answer(update)
 
