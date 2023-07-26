@@ -688,8 +688,21 @@ async def handle_invalid_button(update, context):
 ##### Main
 
 async def post_init(application):
+    commands = []
+    if config_block_exists('ALARMO'):
+        commands.append(BotCommand('alarm', 'para visualizar las opciones de la alarma.'))
+    if config_block_exists('CAMERAS'):
+        commands.append(BotCommand('cameras', 'para visualizar las opciones de gestión de cámaras.'))
+    commands.append(BotCommand('commands', 'para visualizar la lista de comandos disponibles.'))
+    if config_block_exists('DOCKERS'):
+        commands.append(BotCommand('dockers', 'para visualizar las opciones de gestión de contenedores.'))
+    if config_block_exists('VPN'):
+        commands.append(BotCommand('vpn', 'para visualizar las opciones de gestión de la VPN'))
+    commands.append(BotCommand('menu', 'para visualizar el menú del bot.'))
+    commands.append(BotCommand('uptime', 'para visualizar cuándo se realizó el último reinicio.'))
+    commands.append(BotCommand('whatsmyip', 'para visualizar la dirección IP pública del router.'))
+    await application.bot.set_my_commands(commands)
     BOT_MESSAGES.clear()
-    await application.bot.set_my_commands([ BotCommand('alarm', 'para visualizar las opciones de la alarma.'), BotCommand('cameras', 'para visualizar las opciones de gestión de cámaras.'), BotCommand('commands', 'para visualizar la lista de comandos disponibles.'), BotCommand('dockers', 'para visualizar las opciones de gestión de contenedores.'), BotCommand('vpn', 'para visualizar las opciones de gestión de la VPN'), BotCommand('menu', 'para visualizar el menú del bot.'), BotCommand('uptime', 'para visualizar el tiempo que lleva en marcha el server.'), BotCommand('whatsmyip', 'para visualizar la dirección IP pública del router.') ])
 
 async def post_stop(application): 
     for chat_id in BOT_MESSAGES:
