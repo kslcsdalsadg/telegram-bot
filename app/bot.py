@@ -192,7 +192,7 @@ async def get_main_menu(user, chat, data):
         if config_block_exists('VPN'):
             menu.append([InlineKeyboardButton('Gestiona tu VPN', callback_data=get_callback_data('vpn-menu', current_callback_data = data))])
     menu.append([ InlineKeyboardButton('Muestra la IP pública del router', callback_data = get_callback_data('whats-my-ip', current_callback_data = data)) ])
-    menu.append([ InlineKeyboardButton('Muestra el tiempo que lleva funcionando la máquina', callback_data = get_callback_data('uptime', current_callback_data = data)) ])
+    menu.append([ InlineKeyboardButton('Muestra el tiempo transcurrido desde el último reinicio', callback_data = get_callback_data('uptime', current_callback_data = data)) ])
     text = [ 'Selecciona una opción para continuar o {}'.format(exit_text_suggestion) ]
     menu.append([ exit_button ])
     return menu, text
@@ -358,7 +358,7 @@ async def list_commands(update, context):
             '',
             '<b>/menu</b>: Muestra el menú general',
             '<b>/whatsmyip</b>: Muestra la IP pública del router',
-            '<b>/uptime</b>: Muestra el tiempo que el server lleva funcionando',
+            '<b>/uptime</b>: Muestra el tiempo desde el último reinicio',
         ],
         'alarm': [
             '<u>Gestión de la alarma:</u>',
@@ -644,7 +644,7 @@ async def handle_whats_my_ip_command(update, context):
 async def _uptime(update, context):
     callback_query_answer_done = False
     if is_user_allowed_to_interact_with_the_chat(get_effective_user(update), get_effective_chat(update)):
-        message = await update.effective_chat.send_message('La máquina lleva funcionando desde las {} ({})'.format(datetime.fromtimestamp(time() - get_uptime(False)).strftime('%H:%M:%S del %d/%m/%Y'), get_uptime(True)))
+        message = await update.effective_chat.send_message('El último reinicio fue el {} a las {} ({})'.format(datetime.fromtimestamp(time() - get_uptime(False)).strftime('%d/%m/%Y'), datetime.fromtimestamp(time() - get_uptime(False)).strftime('%H:%M:%S'), get_uptime(True)))
         await callback_query_answer(update)
         callback_query_answer_done = True
     if not callback_query_answer_done:
