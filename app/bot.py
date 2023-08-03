@@ -206,13 +206,16 @@ async def get_alarm_menu(user, chat, data):
     if config_block_exists('ALARMO'):
         text = ['Ahora mismo no se puede interactuar con tu alarma.', '', back_text_suggestion.capitalize()]
         if AlarmoUtils.can_change_state():
-            if AlarmoUtils.get_state() == 'disarmed':
+            current_state = AlarmoUtils.get_state()
+            if current_state == 'disarmed':
+                current_state_name = 'desconectada'
                 for arm_mode in config.ALARMO['arm-modes']:
                     if arm_mode in ALARMO_ACTIONS:
                         menu.append([ InlineKeyboardButton('Conecta la alarma en modo "{}"'.format(_get_alarmo_arm_mode_name(arm_mode)), callback_data = get_callback_data('set-alarm-arm-mode', action_modifiers = { 'arm-mode': arm_mode }, current_callback_data = data)) ])
             else:
+                current_state_name = 'conectada en modo "{}"'.format(_get_alarmo_arm_mode_name(current_state))
                 menu.append([ InlineKeyboardButton('Desconecta la alarma', callback_data = get_callback_data('set-alarm-arm-mode', action_modifiers = { 'arm-mode': 'disarm' }, current_callback_data = data)) ])
-            text = [ 'Te mostramos las opciones de gestión de tu alarma.', '', 'Haz clic en una o {}'.format(back_text_suggestion) ]
+            text = [ 'La alarma está {}.'.format(current_state_name), 'Te mostramos las opciones de gestión de tu alarma.', '', 'Haz clic en una o {}'.format(back_text_suggestion) ]
     menu.append([ back_button ])
     return menu, text
 
