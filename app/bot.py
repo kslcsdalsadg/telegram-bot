@@ -200,6 +200,12 @@ async def get_main_menu(user, chat, data):
 def _get_alarmo_arm_mode_name(arm_mode):
     return config.ALARMO['arm-modes-names'][arm_mode] if ('arm-modes-names' in config.ALARMO) and (arm_mode in config.ALARMO['arm-modes-names']) else ALARMO_ACTIONS[arm_mode]['name']
 
+def _get_alarmo_arm_mode_name_by_state(state):
+    for key in ALARMO_ACTIONS.keys():
+        if ALARMO_ACTIONS[key]['state'] == state: 
+            return _get_alarmo_arm_mode_name(key)
+    return 'desconocido'
+    
 async def get_alarm_menu(user, chat, data):
     back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('alarm-menu', data)
     menu, text = [], [ 'Se ha restringido el acceso a esta funcionalidad en el archivo de configuración.', '', back_text_suggestion.capitalize() ]
@@ -213,7 +219,7 @@ async def get_alarm_menu(user, chat, data):
                     if arm_mode in ALARMO_ACTIONS:
                         menu.append([ InlineKeyboardButton('Conecta la alarma en modo "{}"'.format(_get_alarmo_arm_mode_name(arm_mode)), callback_data = get_callback_data('set-alarm-arm-mode', action_modifiers = { 'arm-mode': arm_mode }, current_callback_data = data)) ])
             else:
-                current_state_name = 'conectada en modo "{}"'.format(_get_alarmo_arm_mode_name(current_state))
+                current_state_name = 'conectada en modo "{}"'.format(_get_alarmo_arm_mode_name_by_state(current_state))
                 menu.append([ InlineKeyboardButton('Desconecta la alarma', callback_data = get_callback_data('set-alarm-arm-mode', action_modifiers = { 'arm-mode': 'disarm' }, current_callback_data = data)) ])
             text = [ 'La alarma está {}.'.format(current_state_name), 'Te mostramos las opciones de gestión de tu alarma.', '', 'Haz clic en una o {}'.format(back_text_suggestion) ]
     menu.append([ back_button ])
