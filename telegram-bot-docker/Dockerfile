@@ -6,11 +6,15 @@ WORKDIR /app
 RUN apt update && apt upgrade -y
 RUN pip install --upgrade pip
 
-# Telegram requirements
+# Telegram bot requirements
 
-RUN pip install python-telegram-bot python-telegram-bot[callback-data] paho-mqtt docker docker-compose
+RUN pip install python-telegram-bot python-telegram-bot[callback-data] 
+RUN pip install paho-mqtt 
+RUN pip install docker 
+RUN pip install PyYAML==5.3.1   # Fijamos la versión de PyYAML, que es importada por docker-compose ya que en las versiones siguientes de PyYAML hay un deprecated que aún no se ha corregido en la versión 1.29.2 de docker-compose.
+RUN pip install docker-compose
 
-# Tapo requirements
+# Tapo cameras requirements
 
 RUN git clone https://github.com/JurajNyiri/pytapo.git /tmp/pytapo
 RUN mv /tmp/pytapo/pytapo /app
