@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 class DockerUtils():
     DATA = { 'client': None }
-    CONFIG = { 'max-wait-time-for-container-stop': 30, 'max-wait-time-for-container-deletion': 30, 'wait-time-for-container-start': 60 }
+    CONFIG = { 'max-wait-time-for-container-stop': 30, 'max-wait-time-for-container-deletion': 30, 'wait-time-for-container-start': 60, 'docker-compose-name': 'docker compose' }
        
     @staticmethod
     def _get_client(): 
@@ -75,7 +75,7 @@ class DockerUtils():
 
     @staticmethod
     def _execute_docker_compose_command(docker_compose_file, command, host_indirection, delay_before_return = 0):
-        command = 'docker-compose -f %s %s' % ( docker_compose_file, command )
+        command = '%s -f %s %s' % ( DockerUtils.DATA['docker-compose-name'], docker_compose_file, command )
         if host_indirection:
             command = 'ssh %s %s' % ( host_indirection, command )
         logger.info('Intentando ejecutar un comando de sistema: ' + command)
