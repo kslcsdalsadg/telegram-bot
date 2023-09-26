@@ -68,6 +68,18 @@ CAMERAS = {
     },
 }
 
+COMPUTERS = {
+   'devices': {												   # Lista de dispositivos que se pueden despertar usando el comando wakeonlan.
+        '1': {												   # ID de la máquina 
+			'name': 'NOMBRE',								   # Nombre de la máquina	
+			'mac':  '01:23:45:67:89',						   # Dirección MAC (opcional, necesario para wakeonlan)
+			'ip':   '192.168.1.15'                             # Dirección IP (opcional, necesario para ping)
+		},
+   }
+    'bypassed-confirmations': {
+        'wakeonlan': False,
+    },
+}
 DOCKERS = {
     'host-indirection': 'roberto@localhost',                   # Si se define, el comando 'docker-compose' se ejecutará en el user-host descrito en lugar de en el docker/host local
                                                                # Necesitará añadir la clave del usuario/host en el que se ejecuta el comando al archivo authorized_keys del usuario/host destino
@@ -85,5 +97,7 @@ VPN = {
    'bypassed-confirmations': {
         'start': False,
         'stop': False,
-    },
+   },
 }
+
+

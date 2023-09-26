@@ -8,6 +8,8 @@ from utils.docker import DockerUtils
 from utils.mqtt import MqttAgent
 from utils.alarmo import AlarmoUtils
 from utils.camera import CameraUtils
+from utils.device import DeviceUtils
+from utils.wake_on_lan import WakeOnLanUtils
 from utils.whats_my_ip import WhatsMyIp
 
 import config
@@ -62,6 +64,13 @@ def get_uptime(get_as_string):
         if uptimes[i]['value'] or ((i == len(uptimes) - 1) and (len(strings) == 0)):
             strings.append('{} {}'.format(uptimes[i]['value'], uptimes[i]['description_one'] if uptimes[i]['value'] == 1 else uptimes[i]['description_other']))
     return " y ".join([", ".join(strings[:-1]), strings[-1]]) if len(strings) > 1 else strings[0] 
+
+def search_for_dictionary_at_dictionary_values(dictionary, keys, value):
+    for entry_id in dictionary:
+        if value == entry_id: return entry_id;
+        for key in keys:
+            if key in dictionary[entry_id] and dictionary[entry_id][key] == value: return entry_id
+    return None
 
 ##### Gestión de errores Telegram
 
@@ -175,7 +184,9 @@ def _get_go_previous_menu_button_and_text_suggestion(current_menu, data = None):
         action, action_text, text = 'main-menu', '< Atrás', 'pulsa el botón "&lt; Atrás" para volver al menú principal.'
         if current_menu == 'camera-menu':
             action, action_text, text = 'cameras-menu', '< Atrás', 'pulsa el botón "&lt; Atrás" para volver a la lista de cámaras.'
-        if current_menu == 'docker-menu':
+        elif current_menu == 'computer-menu':
+            action, action_text, text = 'computers-menu', '< Atrás', 'pulsa el botón "&lt; Atrás" para volver a la lista de máquinas.'
+        elif current_menu == 'docker-menu':
             action, action_text, text = 'dockers-menu', '< Atrás', 'pulsa el botón "&lt; Atrás" para volver a la lista de contenedores.'
     return InlineKeyboardButton(action_text, callback_data = get_callback_data(action, current_callback_data = data)), text
 
@@ -187,6 +198,8 @@ async def get_main_menu(user, chat, data):
     if await is_user_allowed_to_exec_administrative_commands(user):
         if config_block_exists('CAMERAS') and 'devices' in config.CAMERAS:
             menu.append([ InlineKeyboardButton('Gestiona tus cámaras', callback_data = get_callback_data('cameras-menu', current_callback_data = data)) ])
+        if config_block_exists('COMPUTERS') and 'devices' in config.COMPUTERS:
+            menu.append([ InlineKeyboardButton('Gestiona tus máquinas', callback_data = get_callback_data('computers-menu', current_callback_data = data)) ])
         if config_block_exists('DOCKERS'):
             menu.append([ InlineKeyboardButton('Gestiona tus contenedores', callback_data = get_callback_data('dockers-menu', current_callback_data = data)) ])
         if config_block_exists('VPN'):
@@ -250,7 +263,49 @@ async def get_camera_menu(user, chat, data):
             camera_data = config.CAMERAS['devices'][data['camera-id']] if ('devices' in config.CAMERAS) and (data['camera-id'] in config.CAMERAS['devices']) else None
             if camera_data is not None:
                 menu.append([ InlineKeyboardButton('Reiniciar la cámara', callback_data = get_callback_data('interact-with-a-camera', action_modifiers = { 'camera-id': data['camera-id'], 'command': 'restart' }, current_callback_data = data)) ])
-            text = [ 'La dirección IP asociada a la cámara "{}" es la "{}.".'.format(camera_data['name'], camera_data['ip']), '', 'Haz clic sobre la acción a ejecutar o {}'.format(back_text_suggestion) ] if camera_data is not None else [ 'La cámara que has indicado no existe o no es accesible para este bot.', '', back_text_suggestion.capitalize() ]
+            text = [ 'La dirección IP asociada a la cámara "{}" es la "{}".'.format(camera_data['name'], camera_data['ip']), '', 'Haz clic sobre la acción a ejecutar o {}'.format(back_text_suggestion) ] if camera_data is not None else [ 'La cámara {} no existe o no es accesible para este bot.'.format(data['camera-id']), '', back_text_suggestion.capitalize() ]
+    menu.append([ back_button ])
+    return menu, text
+
+async def get_computers_menu(user, chat, data):
+    back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('computers-menu', data)
+    menu, text = [], [ 'No tienes permiso para acceder a esta funcionalidad.', '', back_text_suggestion.capitalize() ]
+    if await is_user_allowed_to_exec_administrative_commands(user):
+        text = ['Se ha restringido el acceso a esta funcionalidad en el archivo de configuración.', '', back_text_suggestion.capitalize()]
+        if config_block_exists('COMPUTERS'):
+            devices = []
+            if 'devices' in config.COMPUTERS:
+                for device_id in config.COMPUTERS['devices'].keys():
+                    devices.append({ 'id': device_id, 'name': config.COMPUTERS['devices'][device_id]['name'] })
+            for device_data in sorted(devices, key = lambda device_data: device_data['name']):
+                menu.append([ InlineKeyboardButton(device_data['name'], callback_data = get_callback_data('computer-menu', action_modifiers = { 'device-id': device_data['id'] }, current_callback_data = data)) ])
+            text = [ 'Te mostramos la lista de máquinas.', '', 'Haz clic en el nombre de cualquiera de ellas para ver las opciones disponibles o {}'.format(back_text_suggestion) ] if len(menu) > 0 else [ 'No hay máquinas disponibles.', '', back_text_suggestion.capitalize() ]
+    menu.append([ back_button ])
+    return menu, text
+
+async def get_computer_menu(user, chat, data):
+    back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('computer-menu', data)
+    menu, text = [], [ 'No tienes permiso para acceder a esta funcionalidad.', '', back_text_suggestion.capitalize() ]
+    if await is_user_allowed_to_exec_administrative_commands(user):
+        text = [ 'Se ha restringido el acceso a esta funcionalidad en el archivo de configuración.', '', back_text_suggestion.capitalize() ]
+        if config_block_exists('COMPUTERS'):
+            device_data = None
+            if 'devices' in config.COMPUTERS:
+                if data['device-id'] in config.COMPUTERS['devices']:
+                    device_data = config.COMPUTERS['devices'][data['device-id']]
+                if device_data is not None:
+                    text = []
+                    if 'mac' in device_data:
+                        menu.append([ InlineKeyboardButton('Encender la máquina', callback_data = get_callback_data('interact-with-a-computer', action_modifiers = { 'device-id': data['device-id'], 'command': 'wakeonlan' }, current_callback_data = data)) ])
+                        text = [ 'La dirección MAC de "{}" es la "{}".'.format(device_data['name'], device_data['mac']) ]
+                    if 'ip' in device_data:
+                        menu.append([ InlineKeyboardButton('Enviar un mensaje "ping" a la máquina', callback_data = get_callback_data('interact-with-a-computer', action_modifiers = { 'device-id': data['device-id'], 'command': 'ping' }, current_callback_data = data)) ])
+                        text = [ 'La dirección IP asociada a la máquina "{}" es la "{}".'.format(device_data['name'], device_data['ip']) ]
+                    if text:
+                        text.append('');
+                    text.append('Haz clic sobre la opción a ejecutar o {}'.format(back_text_suggestion))
+            if device_data is None:
+                text = [ 'La máquina "{}" no existe o no es accesible para este bot.'.format(data['device-id']), '', back_text_suggestion.capitalize() ]
     menu.append([ back_button ])
     return menu, text
 
@@ -315,6 +370,10 @@ async def _menu(update, context, data):
         menu, text = await get_cameras_menu(user, chat, data)
     elif data['action'] == 'camera-menu':
         menu, text = await get_camera_menu(user, chat, data)
+    elif data['action'] == 'computers-menu':
+        menu, text = await get_computers_menu(user, chat, data)
+    elif data['action'] == 'computer-menu':
+        menu, text = await get_computer_menu(user, chat, data)
     elif data['action'] == 'dockers-menu':
         menu, text = await get_dockers_menu(user, chat, data)
     elif data['action'] == 'docker-menu':
@@ -344,6 +403,10 @@ async def alarm_menu(update, context):
 async def cameras_menu(update, context):
     await update.message.delete()
     await _menu(update, context, { 'action': 'cameras-menu', 'root-menu': 'cameras-menu' })
+
+async def computers_menu(update, context):
+    await update.message.delete()
+    await _menu(update, context, { 'action': 'computers-menu', 'root-menu': 'computers-menu' })
 
 async def dockers_menu(update, context):
     await update.message.delete()
@@ -381,6 +444,11 @@ async def list_commands(update, context):
             '',
             '<b>/cameras</b> : Muestra el menú de cámaras',
         ],
+        'computers': [
+            '<u>Gestión de las máquinas:</u>',
+            '',
+            '<b>/computers</b> : Muestra la lista de máquinas máquinas',
+        ],
         'dockers': [
             '<u>Gestión de los dockers:</u>',
             '',
@@ -413,6 +481,14 @@ async def list_commands(update, context):
             for camera_id in config.CAMERAS['devices']:
                 messages['cameras'].append('<b>/camera {} {}</b> : Reinicia la cámara "{}"'.format(camera_id, 'restart', config.CAMERAS['devices'][camera_id]['name']))
             text += "\n\n" + "\n".join(messages['cameras'])
+        if config_block_exists('COMPUTERS') and 'devices' in config.COMPUTERS:
+            messages['computers'].append('')
+            for device_id in config.COMPUTERS['devices']:
+                if 'mac' in config.COMPUTERS['devices'][device_id]:
+                    messages['computers'].append('<b>/wakeonlan {}</b> : Inicia la máquina "{}"'.format(device_id, config.COMPUTERS['devices'][device_id]['name']))
+                if 'ip' in config.COMPUTERS['devices'][device_id]:
+                    messages['computers'].append('<b>/ping {}</b> : Envía un mensaje "ping" a la máquina "{}"'.format(device_id, config.COMPUTERS['devices'][device_id]['name']))
+            text += "\n\n" + "\n".join(messages['computers'])
         if config_block_exists('DOCKERS'):
             text += "\n\n" + "\n".join(messages['dockers'])
         if config_block_exists('VPN'):
@@ -443,6 +519,8 @@ async def _indirect_action(update, context, data):
                     data['action'] = 'alarm-menu'
                 elif caller == 'interact-with-a-camera':
                     data['action'] = 'camera-menu'
+                elif caller == 'interact-with-a-computer':
+                    data['action'] = 'computer-menu'
                 elif caller == 'interact-with-a-docker':
                     data['action'] = 'docker-menu'
                 elif caller == 'interact-with-the-vpn':
@@ -455,6 +533,8 @@ async def _indirect_action(update, context, data):
                     await _set_alarm_arm_mode(update, context, data)
                 elif data['action'] == 'interact-with-a-camera':
                     await _interact_with_a_camera(update, context, data)
+                elif data['action'] == 'interact-with-a-computer':
+                    await _interact_with_a_computer(update, context, data)
                 elif data['action'] == 'interact-with-a-docker':
                     await _interact_with_a_docker(update, context, data)
                 elif data['action'] == 'interact-with-the-vpn':
@@ -486,6 +566,8 @@ async def _set_alarm_arm_mode(update, context, data):
                 await callback_query_answer(update)
                 callback_query_answer_done = True
                 await _confirm(update, 'desconectar la alarma' if arm_mode == 'disarm' else 'configurar la alarma en modo "{}"'.format(_get_alarmo_arm_mode_name(arm_mode)), data)
+        else:
+            message = await update.effective_chat.send_message('"{}" no es un modo válido para la alarma'.format(arm_mode)); 
     if not callback_query_answer_done:
         await callback_query_answer(update)
 
@@ -535,6 +617,66 @@ async def handle_camera_command(update, context):
     else:
         await _menu(update, context, { 'action': 'cameras-menu', 'root-menu': 'cameras-menu' })
     
+##### Inicio remoto de un dispositivo
+
+async def _interact_with_a_computer(update, context, data):
+    callback_query_answer_done = False
+    if 'command' in data and 'device-id' in data and config_block_exists('COMPUTERS') and await is_user_allowed_to_exec_administrative_commands(get_effective_user(update)):
+        device_data = config.COMPUTERS['devices'][data['device-id']] if 'devices' in config.COMPUTERS and data['device-id'] in config.COMPUTERS['devices'] else None
+        if device_data is not None:
+            if data['command'] == 'wakeonlan' and 'mac' in device_data:
+                if _is_confirmed(config.COMPUTERS, data['command'], data):
+                    message = await update.effective_chat.send_message('Espera mientras tratamos de acceder a la máquina para encenderla.', disable_notification = True)
+                    WakeOnLanUtils.start(device_data['mac'], device_data['ip'] if 'ip' in device_data else None)
+                    await message.delete()
+                    await callback_query_answer(update)
+                    if 'root-menu' in data:
+                        await _menu(update, context, {'action': 'computer-menu', 'root-menu': data['root-menu'], 'device-id': data['device-id'] })
+                    callback_query_answer_done = True
+                else:
+                    await callback_query_answer(update)
+                    callback_query_answer_done = True
+                    await _confirm(update, 'Encender la máquina "{}"'.format(device_data['name']), data)
+            elif data['command'] == 'ping' and 'ip' in device_data:
+                message = await update.effective_chat.send_message('Espera mientras tratamos de acceder a la máquina.', disable_notification = True)
+                is_online = DeviceUtils.is_online(device_data['ip'])
+                await message.edit_text('La máquina "{}" {}'.format(device_data['name'], 'está respondiendo en la dirección "{}".'.format(device_data['ip']) if is_online else 'no parece estar conectada.')) 
+                await callback_query_answer(update)
+                callback_query_answer_done = True
+        if not callback_query_answer_done:
+            message = await update.effective_chat.send_message('La máquina "{}" no existe o el bot no puede interactuar con ella.'.format(data['device-id'])); 
+    if not callback_query_answer_done:
+        await callback_query_answer(update)
+
+async def interact_with_a_computer(update, context):
+    await _interact_with_a_computer(update, context, update.callback_query.data)
+
+def is_interact_with_a_computer_request(data):
+    return isinstance(data, dict) and 'action' in data and data['action'] == 'interact-with-a-computer';
+
+##### Interacción con una máquina
+
+async def handle_computer_command(update, context):
+    await update.message.delete()
+    if len(context.args) == 1:
+        await _menu(update, context, { 'action': 'computer-menu', 'device-id': context.args[0], 'root-menu': 'computer-menu' })
+    else:
+        await _menu(update, context, { 'action': 'computers-menu', 'root-menu': 'computers-menu' })
+
+async def handle_ping_command(update, context):
+    await update.message.delete()
+    if len(context.args) == 1:
+        await _interact_with_a_computer(update, context, { 'action': 'interact-with-a-computer', 'command': 'ping', 'device-id': context.args[0] })
+    else:
+        await _menu(update, context, { 'action': 'computers-menu', 'root-menu': 'computers-menu' })
+
+async def handle_wakeonlan_command(update, context):
+    await update.message.delete()
+    if len(context.args) == 1:
+        await _interact_with_a_computer(update, context, { 'action': 'interact-with-a-computer', 'command': 'wakeonlan', 'device-id': context.args[0] })
+    else:
+        await _menu(update, context, { 'action': 'computers-menu', 'root-menu': 'computers-menu' })
+
 ##### Interacción con un docker
 
 async def _interact_with_a_docker(update, context, data):
@@ -615,8 +757,6 @@ async def interact_with_the_vpn(update, context):
 
 def is_interact_with_the_vpn_request(data):
     return isinstance(data, dict) and 'action' in data and data['action'] == 'interact-with-the-vpn';
-
-##### Interacción con una cámara
 
 async def handle_vpn_command(update, context):
     await update.message.delete()
@@ -699,17 +839,23 @@ async def handle_invalid_button(update, context):
 async def post_init(application):
     commands = []
     if config_block_exists('ALARMO'):
-        commands.append(BotCommand('alarm', 'para visualizar las opciones de la alarma.'))
+        commands.append(BotCommand('alarm', 'muestra las opciones de la alarma.'))
     if config_block_exists('CAMERAS'):
-        commands.append(BotCommand('cameras', 'para visualizar las opciones de gestión de cámaras.'))
-    commands.append(BotCommand('commands', 'para visualizar la lista de comandos disponibles.'))
+        commands.append(BotCommand('cameras', 'muestra las opciones de gestión de cámaras.'))
+    commands.append(BotCommand('commands', 'muestra la lista de comandos disponibles.'))
+    if config_block_exists('COMPUTERS'):
+        commands.append(BotCommand('computers', 'muestra las opciones de gestión de máquinas.'))
     if config_block_exists('DOCKERS'):
-        commands.append(BotCommand('dockers', 'para visualizar las opciones de gestión de contenedores.'))
+        commands.append(BotCommand('dockers', 'muestra las opciones de gestión de contenedores.'))
     if config_block_exists('VPN'):
-        commands.append(BotCommand('vpn', 'para visualizar las opciones de gestión de la VPN'))
-    commands.append(BotCommand('menu', 'para visualizar el menú del bot.'))
-    commands.append(BotCommand('uptime', 'para visualizar cuándo se realizó el último reinicio.'))
-    commands.append(BotCommand('whatsmyip', 'para visualizar la dirección IP pública del router.'))
+        commands.append(BotCommand('vpn', 'muestra las opciones de gestión de la VPN'))
+    commands.append(BotCommand('menu', 'muestra el menú del bot.'))
+    if config_block_exists('COMPUTERS'):
+        commands.append(BotCommand('ping', 'comprueba si una máquina está conectada.'))
+    commands.append(BotCommand('uptime', 'muestra el tiempo que hace desde el último reinicio.'))
+    if config_block_exists('COMPUTERS'):
+        commands.append(BotCommand('wakeonlan', 'enciende una máquina.'))
+    commands.append(BotCommand('whatsmyip', 'muestra la dirección IP pública del router.'))
     await application.bot.set_my_commands(commands)
     BOT_MESSAGES.clear()
 
@@ -731,13 +877,18 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler('alarm', alarm_menu))
     application.add_handler(CommandHandler('cameras', cameras_menu))
     application.add_handler(CommandHandler('camera', handle_camera_command))
+    application.add_handler(CommandHandler('computers', computers_menu))
+    application.add_handler(CommandHandler('computer', handle_computer_command))
     application.add_handler(CommandHandler('dockers', dockers_menu))
+    application.add_handler(CommandHandler('ping', handle_ping_command))
     application.add_handler(CommandHandler('vpn', handle_vpn_command))
+    application.add_handler(CommandHandler('wakeonlan', handle_wakeonlan_command))
     application.add_handler(CommandHandler('whatsmyip', handle_whats_my_ip_command))
     application.add_handler(CommandHandler('uptime', handle_uptime_command))
     application.add_handler(CallbackQueryHandler(menu, pattern = is_menu_request))
     application.add_handler(CallbackQueryHandler(set_alarm_arm_mode, pattern = is_set_alarm_arm_mode_request))
     application.add_handler(CallbackQueryHandler(interact_with_a_camera, pattern = is_interact_with_a_camera_request))
+    application.add_handler(CallbackQueryHandler(interact_with_a_computer, pattern = is_interact_with_a_computer_request))
     application.add_handler(CallbackQueryHandler(interact_with_a_docker, pattern = is_interact_with_a_docker_request))
     application.add_handler(CallbackQueryHandler(interact_with_the_vpn, pattern = is_interact_with_the_vpn_request))
     application.add_handler(CallbackQueryHandler(indirect_action, pattern = is_indirect_action_request))

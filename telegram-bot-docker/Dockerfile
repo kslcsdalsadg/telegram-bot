@@ -10,9 +10,11 @@ RUN pip install --upgrade pip
 
 RUN pip install python-telegram-bot python-telegram-bot[callback-data] 
 RUN pip install paho-mqtt 
-RUN pip install docker 
+RUN pip install docker
 RUN pip install PyYAML==5.3.1   # Fijamos la versión de PyYAML, que es importada por docker-compose ya que en las versiones siguientes de PyYAML hay un deprecated que aún no se ha corregido en la versión 1.29.2 de docker-compose.
 RUN pip install docker-compose
+
+RUN apt install wakeonlan
 
 # Tapo cameras requirements
 
