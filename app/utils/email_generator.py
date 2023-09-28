@@ -43,16 +43,9 @@ class EmailGenerator():
     def get_random_email(domain):
         while (True):
             alias = EmailGenerator._get_random_email(domain)
-            logging.getLogger(__name__).error("1: " + alias)
             if alias not in EmailGenerator.DATA['aliases']: break
-            logging.getLogger(__name__).error("2: " +alias)
-        logging.getLogger(__name__).error("3: " + str(len(EmailGenerator.DATA['aliases'])))
         EmailGenerator.DATA['aliases'].append(alias)
-        logging.getLogger(__name__).error("4: " + str(len(EmailGenerator.DATA['aliases'])))
-        logging.getLogger(__name__).error("X: " + EmailGenerator.DATA['already-assigned-aliases-pathname'])
-        logging.getLogger(__name__).error("5: " + str(len(EmailGenerator._read_already_assigned_aliases(EmailGenerator.DATA['already-assigned-aliases-pathname']))))
         EmailGenerator._write_already_assigned_aliases(EmailGenerator.DATA['already-assigned-aliases-pathname'], alias)
-        logging.getLogger(__name__).error("6: " + str(len(EmailGenerator._read_already_assigned_aliases(EmailGenerator.DATA['already-assigned-aliases-pathname']))))
         return alias
 
 
