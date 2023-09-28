@@ -9,8 +9,9 @@ from utils.mqtt import MqttAgent
 from utils.alarmo import AlarmoUtils
 from utils.camera import CameraUtils
 from utils.device import DeviceUtils
-from utils.wake_on_lan import WakeOnLanUtils
+from utils.wake_on_lan import WakeOnLan
 from utils.whats_my_ip import WhatsMyIp
+from utils.email_generator import EmailGenerator
 
 import config
 
@@ -204,6 +205,8 @@ async def get_main_menu(user, chat, data):
             menu.append([ InlineKeyboardButton('Gestiona tus contenedores', callback_data = get_callback_data('dockers-menu', current_callback_data = data)) ])
         if config_block_exists('VPN'):
             menu.append([InlineKeyboardButton('Gestiona tu VPN', callback_data=get_callback_data('vpn-menu', current_callback_data = data))])
+        if config_block_exists('EMAIL_GENERATOR'):
+            menu.append([InlineKeyboardButton('Genera una dirección de email aleatoria', callback_data=get_callback_data('generate-random-email', current_callback_data = data))])
     menu.append([ InlineKeyboardButton('Muestra la IP pública del router', callback_data = get_callback_data('whats-my-ip', current_callback_data = data)) ])
     menu.append([ InlineKeyboardButton('Muestra el tiempo transcurrido desde el último reinicio', callback_data = get_callback_data('uptime', current_callback_data = data)) ])
     text = [ 'Selecciona una opción para continuar o {}'.format(exit_text_suggestion) ]
@@ -431,6 +434,7 @@ async def list_commands(update, context):
             '<b>/menu</b>: Muestra el menú general',
             '<b>/whatsmyip</b>: Muestra la IP pública del router',
             '<b>/uptime</b>: Muestra el tiempo desde el último reinicio',
+            '<b>/getemail</b>: Genera una dirección de correo electrónico aleatoria',
         ],
         'alarm': [
             '<u>Gestión de la alarma:</u>',
@@ -627,7 +631,7 @@ async def _interact_with_a_computer(update, context, data):
             if data['command'] == 'wakeonlan' and 'mac' in device_data:
                 if _is_confirmed(config.COMPUTERS, data['command'], data):
                     message = await update.effective_chat.send_message('Espera mientras tratamos de acceder a la máquina para encenderla.', disable_notification = True)
-                    WakeOnLanUtils.start(device_data['mac'], device_data['ip'] if 'ip' in device_data else None)
+                    WakeOnLan.start(device_data['mac'], device_data['ip'] if 'ip' in device_data else None)
                     await message.delete()
                     await callback_query_answer(update)
                     if 'root-menu' in data:
@@ -788,6 +792,29 @@ async def handle_whats_my_ip_command(update, context):
     await update.message.delete()
     await _whats_my_ip(update, context)
 
+##### Generar una dirección de email random
+
+async def _generate_random_email(update, context):
+    callback_query_answer_done = False
+    if config_block_exists('EMAIL_GENERATOR') and 'domain' in config.EMAIL_GENERATOR and is_user_allowed_to_exec_administrative_commands(get_effective_user(update)):
+        message = await update.effective_chat.send_message('Espera un momento mientras tratamos de generar una dirección de correo electrónico aleatoria.')
+        email = EmailGenerator.get_random_email(config.EMAIL_GENERATOR['domain'])
+        await message.edit_text('La dirección que hemos generado es "{}"'.format(email))
+        await callback_query_answer(update)
+        callback_query_answer_done = True
+    if not callback_query_answer_done:
+        await callback_query_answer(update)
+
+async def generate_random_email(update, context):
+    await _generate_random_email(update, context)
+
+def is_generate_random_email_request(data):
+    return isinstance(data, dict) and 'action' in data and data['action'] == 'generate-random-email'
+
+async def handle_generate_random_email_command(update, context):
+    await update.message.delete()
+    await _generate_random_email(update, context)
+
 ##### Obtener el uptime de la máquina
 
 async def _uptime(update, context):
@@ -847,12 +874,14 @@ async def post_init(application):
         commands.append(BotCommand('computers', 'muestra las opciones de gestión de máquinas.'))
     if config_block_exists('DOCKERS'):
         commands.append(BotCommand('dockers', 'muestra las opciones de gestión de contenedores.'))
-    if config_block_exists('VPN'):
-        commands.append(BotCommand('vpn', 'muestra las opciones de gestión de la VPN'))
+    if config_block_exists('EMAIL_GENERATOR'):
+        commands.append(BotCommand('getemail', 'genera una dirección de correo electrónico aleatoria.'))
     commands.append(BotCommand('menu', 'muestra el menú del bot.'))
     if config_block_exists('COMPUTERS'):
         commands.append(BotCommand('ping', 'comprueba si una máquina está conectada.'))
     commands.append(BotCommand('uptime', 'muestra el tiempo que hace desde el último reinicio.'))
+    if config_block_exists('VPN'):
+        commands.append(BotCommand('vpn', 'muestra las opciones de gestión de la VPN'))
     if config_block_exists('COMPUTERS'):
         commands.append(BotCommand('wakeonlan', 'enciende una máquina.'))
     commands.append(BotCommand('whatsmyip', 'muestra la dirección IP pública del router.'))
@@ -869,6 +898,10 @@ if __name__ == '__main__':
     MqttAgent.initialize()
     AlarmoUtils.initialize()
     DockerUtils.initialize()
+    if config_block_exists('EMAIL_GENERATOR'): 
+        pathname = config.EMAIL_GENERATOR['history-pathname']
+        if not pathname.startswith(os.pathsep): pathname = os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir, pathname))
+        EmailGenerator.initialize(pathname)
     application = Application.builder().token(config.TELEGRAM['bot-token']).arbitrary_callback_data(True).post_init(post_init).post_stop(post_stop).build()
     application.add_error_handler(error_handler)
     application.add_handler(ChatMemberHandler(greet_chat_members, ChatMemberHandler.CHAT_MEMBER))
@@ -884,6 +917,7 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler('vpn', handle_vpn_command))
     application.add_handler(CommandHandler('wakeonlan', handle_wakeonlan_command))
     application.add_handler(CommandHandler('whatsmyip', handle_whats_my_ip_command))
+    application.add_handler(CommandHandler('getemail', handle_generate_random_email_command))
     application.add_handler(CommandHandler('uptime', handle_uptime_command))
     application.add_handler(CallbackQueryHandler(menu, pattern = is_menu_request))
     application.add_handler(CallbackQueryHandler(set_alarm_arm_mode, pattern = is_set_alarm_arm_mode_request))
@@ -893,6 +927,7 @@ if __name__ == '__main__':
     application.add_handler(CallbackQueryHandler(interact_with_the_vpn, pattern = is_interact_with_the_vpn_request))
     application.add_handler(CallbackQueryHandler(indirect_action, pattern = is_indirect_action_request))
     application.add_handler(CallbackQueryHandler(whats_my_ip, pattern = is_whats_my_ip_request))
+    application.add_handler(CallbackQueryHandler(generate_random_email, pattern = is_generate_random_email_request))
     application.add_handler(CallbackQueryHandler(uptime, pattern = is_uptime_request))
     application.add_handler(CallbackQueryHandler(exit_menu, pattern = is_exit_menu_request))
     application.add_handler(CallbackQueryHandler(handle_invalid_button, pattern = InvalidCallbackData))

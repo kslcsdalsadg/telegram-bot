@@ -4,7 +4,7 @@ from time import sleep
 
 import os
 
-class WakeOnLanUtils():
+class WakeOnLan():
     CONFIG = { 'max-wait-time-for-maquine-boot': 60 }
 
     @staticmethod

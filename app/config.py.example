@@ -100,4 +100,9 @@ VPN = {
    },
 }
 
+EMAIL_GENERATOR = {
+    'history-pathname': 'aliases.txt',                          # Pathname del fichero de alias que ya se han generado
+    'domain': 'example.com',                                    # Dominio en el que se generan los alias
+}
+
 

@@ -20,7 +20,7 @@ class CameraUtils():
                             
     @staticmethod
     def restart(camera_vendor, ip_address, username, password):
-        if DeviceUtils.is_online(ip_address):
+        if Computer.is_online(ip_address):
             if camera_vendor == 'tapo':
-                CameraUtils._restart_tapo(ip_address, username, password)
+                DeviceUtils._restart_tapo(ip_address, username, password)
         
