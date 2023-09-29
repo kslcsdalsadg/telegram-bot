@@ -13,7 +13,7 @@ class WakeOnLan():
             os.system("wakeonlan " + mac_address)
             sleep(15)
             if ip_address is not None:
-                for i in range(WakeOnLanUtils.CONFIG['max-wait-time-for-maquine-boot']):
+                for i in range(WakeOnLan.CONFIG['max-wait-time-for-maquine-boot']):
                     if DeviceUtils.is_online(ip_address):
                         break
                     sleep(i)

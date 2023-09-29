@@ -279,9 +279,13 @@ async def get_computers_menu(user, chat, data):
             devices = []
             if 'devices' in config.COMPUTERS:
                 for device_id in config.COMPUTERS['devices'].keys():
-                    devices.append({ 'id': device_id, 'name': config.COMPUTERS['devices'][device_id]['name'] })
+                    device_data = dict(config.COMPUTERS['devices'][device_id])
+                    device_data['id'] = device_id
+                    devices.append(device_data)
             for device_data in sorted(devices, key = lambda device_data: device_data['name']):
-                menu.append([ InlineKeyboardButton(device_data['name'], callback_data = get_callback_data('computer-menu', action_modifiers = { 'device-id': device_data['id'] }, current_callback_data = data)) ])
+                if not 'exclusive' in data: menu.append([ InlineKeyboardButton(device_data['name'], callback_data = get_callback_data('computer-menu', action_modifiers = { 'device-id': device_data['id'] }, current_callback_data = data)) ])
+                elif data['exclusive'] == 'wakeonlan' and 'ip' in device_data: menu.append([ InlineKeyboardButton(device_data['name'], callback_data = get_callback_data('interact-with-a-computer', action_modifiers = { 'device-id': device_data['id'], 'command': 'wakeonlan', 'exclusive': 'wakeonlan' }, current_callback_data = data)) ])
+                elif data['exclusive'] == 'ping' and 'ip' in device_data: menu.append([ InlineKeyboardButton(device_data['name'], callback_data = get_callback_data('interact-with-a-computer', action_modifiers = { 'device-id': device_data['id'], 'command': 'ping', 'exclusive': 'ping' }, current_callback_data = data)) ])
             text = [ 'Te mostramos la lista de máquinas.', '', 'Haz clic en el nombre de cualquiera de ellas para ver las opciones disponibles o {}'.format(back_text_suggestion) ] if len(menu) > 0 else [ 'No hay máquinas disponibles.', '', back_text_suggestion.capitalize() ]
     menu.append([ back_button ])
     return menu, text
@@ -667,19 +671,19 @@ async def handle_computer_command(update, context):
     else:
         await _menu(update, context, { 'action': 'computers-menu', 'root-menu': 'computers-menu' })
 
-async def handle_ping_command(update, context):
-    await update.message.delete()
-    if len(context.args) == 1:
-        await _interact_with_a_computer(update, context, { 'action': 'interact-with-a-computer', 'command': 'ping', 'device-id': context.args[0] })
-    else:
-        await _menu(update, context, { 'action': 'computers-menu', 'root-menu': 'computers-menu' })
-
 async def handle_wakeonlan_command(update, context):
     await update.message.delete()
     if len(context.args) == 1:
         await _interact_with_a_computer(update, context, { 'action': 'interact-with-a-computer', 'command': 'wakeonlan', 'device-id': context.args[0] })
     else:
-        await _menu(update, context, { 'action': 'computers-menu', 'root-menu': 'computers-menu' })
+        await _menu(update, context, { 'action': 'computers-menu', 'root-menu': 'computers-menu', 'exclusive': 'wakeonlan' })
+
+async def handle_ping_command(update, context):
+    await update.message.delete()
+    if len(context.args) == 1:
+        await _interact_with_a_computer(update, context, { 'action': 'interact-with-a-computer', 'command': 'ping', 'device-id': context.args[0] })
+    else:
+        await _menu(update, context, { 'action': 'computers-menu', 'root-menu': 'computers-menu', 'exclusive': 'ping' })
 
 ##### Interacción con un docker
 
