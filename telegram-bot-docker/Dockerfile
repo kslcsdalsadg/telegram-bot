@@ -15,7 +15,7 @@ RUN pip install PyYAML==5.3.1   # Fijamos la versión de PyYAML, que es importad
 RUN pip install docker-compose
 RUN pip install english-words
 
-RUN apt install wakeonlan
+RUN apt install -y wakeonlan
 
 # Tapo cameras requirements
 

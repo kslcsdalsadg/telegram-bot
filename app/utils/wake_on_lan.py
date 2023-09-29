@@ -16,4 +16,4 @@ class WakeOnLan():
                 for i in range(WakeOnLan.CONFIG['max-wait-time-for-maquine-boot']):
                     if DeviceUtils.is_online(ip_address):
                         break
-                    sleep(i)
+                    sleep(1)
