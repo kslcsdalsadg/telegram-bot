@@ -3,10 +3,6 @@ from english_words import get_english_words_set
 import random
 import os
 
-import logging
-
-logger = logging.getLogger(__name__)
-
 class EmailGenerator():
     DATA = { 'web2lowerset': None, 'already-assigned-aliases-pathname': None, 'aliases': None }
 
@@ -23,7 +19,8 @@ class EmailGenerator():
         if os.path.isfile(already_assigned_aliases_pathname):
             with open(already_assigned_aliases_pathname,'r') as lines:
                 for line in lines:
-                       aliases.append(line.rstrip("\n"))
+                       data = line.rstrip("\n").split(':', 1)
+                       aliases.append(data[0])
         return aliases
 
     @staticmethod
@@ -40,12 +37,12 @@ class EmailGenerator():
             EmailGenerator.DATA['aliases'] = EmailGenerator._read_already_assigned_aliases(EmailGenerator.DATA['already-assigned-aliases-pathname'])
 
     @staticmethod
-    def get_random_email(domain):
+    def get_random_email(domain, description = None):
         while (True):
             alias = EmailGenerator._get_random_email(domain)
             if alias not in EmailGenerator.DATA['aliases']: break
         EmailGenerator.DATA['aliases'].append(alias)
-        EmailGenerator._write_already_assigned_aliases(EmailGenerator.DATA['already-assigned-aliases-pathname'], alias)
+        EmailGenerator._write_already_assigned_aliases(EmailGenerator.DATA['already-assigned-aliases-pathname'], '%s:%s' % ( alias, description if description is not None else '' ))
         return alias
 
 
