@@ -803,7 +803,7 @@ async def _generate_random_email(update, context):
     if config_block_exists('EMAIL_GENERATOR') and 'domain' in config.EMAIL_GENERATOR and is_user_allowed_to_exec_administrative_commands(get_effective_user(update)):
         message = await update.effective_chat.send_message('Espera un momento mientras tratamos de generar una dirección de correo electrónico aleatoria.')
         email = EmailGenerator.get_random_email(config.EMAIL_GENERATOR['domain'], None if len(context.args) == 0 else ' '.join(context.args))
-        await message.edit_text('La dirección que hemos generado es "{}"'.format(email))
+        await message.edit_text('La dirección que hemos generado es {}'.format(email))
         await callback_query_answer(update)
         callback_query_answer_done = True
     if not callback_query_answer_done:
