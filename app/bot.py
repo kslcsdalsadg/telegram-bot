@@ -575,7 +575,7 @@ async def _set_alarm_arm_mode(update, context, data):
                 callback_query_answer_done = True
                 await _confirm(update, 'desconectar la alarma' if arm_mode == 'disarm' else 'configurar la alarma en modo "{}"'.format(_get_alarmo_arm_mode_name(arm_mode)), data)
         else:
-            message = await update.effective_chat.send_message('"{}" no es un modo válido para la alarma'.format(arm_mode)); 
+            message = await update.effective_chat.send_message('"{}" no es un modo válido para la alarma'.format(arm_mode), disable_notification = True); 
     if not callback_query_answer_done:
         await callback_query_answer(update)
 
@@ -652,7 +652,7 @@ async def _interact_with_a_computer(update, context, data):
                 await callback_query_answer(update)
                 callback_query_answer_done = True
         if not callback_query_answer_done:
-            message = await update.effective_chat.send_message('La máquina "{}" no existe o el bot no puede interactuar con ella.'.format(data['device-id'])); 
+            message = await update.effective_chat.send_message('La máquina "{}" no existe o el bot no puede interactuar con ella.'.format(data['device-id']), disable_notification = True); 
     if not callback_query_answer_done:
         await callback_query_answer(update)
 
@@ -778,7 +778,7 @@ async def handle_vpn_command(update, context):
 async def _whats_my_ip(update, context):
     callback_query_answer_done = False
     if is_user_allowed_to_interact_with_the_chat(get_effective_user(update), get_effective_chat(update)):
-        message = await update.effective_chat.send_message('Espera un momento mientras tratamos de obtener la dirección IP pública del router.')
+        message = await update.effective_chat.send_message('Espera un momento mientras tratamos de obtener la dirección IP pública del router.', disable_notification = True)
         ip = WhatsMyIp.get()
         await message.edit_text('La dirección IP del router es la "{}"'.format(ip) if ip is not None else 'No se ha podido obtener la dirección IP del router')
         await callback_query_answer(update)
@@ -801,7 +801,7 @@ async def handle_whats_my_ip_command(update, context):
 async def _generate_random_email(update, context):
     callback_query_answer_done = False
     if config_block_exists('EMAIL_GENERATOR') and 'domain' in config.EMAIL_GENERATOR and is_user_allowed_to_exec_administrative_commands(get_effective_user(update)):
-        message = await update.effective_chat.send_message('Espera un momento mientras tratamos de generar una dirección de correo electrónico aleatoria.')
+        message = await update.effective_chat.send_message('Espera un momento mientras tratamos de generar una dirección de correo electrónico aleatoria.', disable_notification = True)
         email = EmailGenerator.get_random_email(config.EMAIL_GENERATOR['domain'], None if len(context.args) == 0 else ' '.join(context.args))
         await message.edit_text('La dirección que hemos generado es {}'.format(email))
         await callback_query_answer(update)
@@ -824,7 +824,7 @@ async def handle_generate_random_email_command(update, context):
 async def _uptime(update, context):
     callback_query_answer_done = False
     if is_user_allowed_to_interact_with_the_chat(get_effective_user(update), get_effective_chat(update)):
-        message = await update.effective_chat.send_message('El último reinicio fue el {} a las {} ({})'.format(datetime.fromtimestamp(time() - get_uptime(False)).strftime('%d/%m/%Y'), datetime.fromtimestamp(time() - get_uptime(False)).strftime('%H:%M:%S'), get_uptime(True)))
+        message = await update.effective_chat.send_message('El último reinicio fue el {} a las {} ({})'.format(datetime.fromtimestamp(time() - get_uptime(False)).strftime('%d/%m/%Y'), datetime.fromtimestamp(time() - get_uptime(False)).strftime('%H:%M:%S'), get_uptime(True)), disable_notification = True)
         await callback_query_answer(update)
         callback_query_answer_done = True
     if not callback_query_answer_done:
