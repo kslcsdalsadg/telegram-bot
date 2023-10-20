@@ -75,7 +75,7 @@ class DockerUtils():
 
     @staticmethod
     def _execute_docker_compose_command(docker_compose_file, command, host_indirection, delay_before_return = 0):
-        command = '%s -f %s %s' % ( DockerUtils.DATA['docker-compose-name'], docker_compose_file, command )
+        command = '%s -f %s %s' % ( DockerUtils.CONFIG['docker-compose-name'], docker_compose_file, command )
         if host_indirection:
             command = 'ssh %s %s' % ( host_indirection, command )
         logger.info('Intentando ejecutar un comando de sistema: ' + command)
