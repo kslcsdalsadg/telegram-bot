@@ -50,8 +50,8 @@ def config_block_exists(name):
 def get_uptime(get_as_string):
     with open('/proc/uptime', 'r') as file:
         uptime_seconds = float(file.readline().split()[0])
-    if not get_as_string:    
-        return uptime_seconds  
+    if not get_as_string:
+        return uptime_seconds
     a_day, a_hour, a_minute = 24 * 60 * 60, 60 * 60, 60
     uptimes = []
     uptimes.append({ 'value': int(uptime_seconds / a_day), 'description_one': 'día', 'description_other': 'días' })
@@ -64,7 +64,7 @@ def get_uptime(get_as_string):
     for i in range(len(uptimes)):
         if uptimes[i]['value'] or ((i == len(uptimes) - 1) and (len(strings) == 0)):
             strings.append('{} {}'.format(uptimes[i]['value'], uptimes[i]['description_one'] if uptimes[i]['value'] == 1 else uptimes[i]['description_other']))
-    return " y ".join([", ".join(strings[:-1]), strings[-1]]) if len(strings) > 1 else strings[0] 
+    return " y ".join([", ".join(strings[:-1]), strings[-1]]) if len(strings) > 1 else strings[0]
 
 def search_for_dictionary_at_dictionary_values(dictionary, keys, value):
     for entry_id in dictionary:
@@ -91,16 +91,16 @@ async def error_handler(update, context):
 ##### Funciones auxiliares para Telegram
 
 def get_effective_chat(update):
-    if update.message: 
+    if update.message:
         return update.message.chat
-    if update.callback_query: 
+    if update.callback_query:
         return update.callback_query.message.chat
     return None
 
 def get_effective_user(update):
-    if update.message: 
+    if update.message:
         return update.message.from_user
-    if update.callback_query: 
+    if update.callback_query:
         return update.callback_query.from_user
     return None
 
@@ -138,16 +138,16 @@ async def delete_menu_message(message):
 
 def is_user_allowed_to_interact_with_the_chat(user, chat = None):
     if config.TELEGRAM:
-      if (chat is not None) and (chat.type != ChatType.PRIVATE) and (chat.id not in config.TELEGRAM['allowed-groups']): 
+      if (chat is not None) and (chat.type != ChatType.PRIVATE) and (chat.id not in config.TELEGRAM['allowed-groups']):
           return False
       return (user is not None) and ((str(user.id) in config.TELEGRAM['allowed-users'].keys()) or (user.username in config.TELEGRAM['allowed-users'].keys()))
     return False
-    
+
 async def is_user_allowed_to_exec_administrative_commands(user):
     if is_user_allowed_to_interact_with_the_chat(user):
-        if str(user.id) in config.TELEGRAM['allowed-users'].keys(): 
+        if str(user.id) in config.TELEGRAM['allowed-users'].keys():
             return config.TELEGRAM['allowed-users'][str(user.id)]
-        if user.username in config.TELEGRAM['allowed-users'].keys(): 
+        if user.username in config.TELEGRAM['allowed-users'].keys():
             return config.TELEGRAM['allowed-users'][user.username]
     return False
 
@@ -218,10 +218,10 @@ def _get_alarmo_arm_mode_name(arm_mode):
 
 def _get_alarmo_arm_mode_name_by_state(state):
     for key in ALARMO_ACTIONS.keys():
-        if ALARMO_ACTIONS[key]['state'] == state: 
+        if ALARMO_ACTIONS[key]['state'] == state:
             return _get_alarmo_arm_mode_name(key)
     return 'desconocido'
-    
+
 async def get_alarm_menu(user, chat, data):
     back_button, back_text_suggestion = _get_go_previous_menu_button_and_text_suggestion('alarm-menu', data)
     menu, text = [], [ 'Se ha restringido el acceso a esta funcionalidad en el archivo de configuración.', '', back_text_suggestion.capitalize() ]
@@ -507,8 +507,8 @@ async def list_commands(update, context):
 ##### Confirma una acción antes de ejecutarla
 
 def _is_confirmed(config_ref, name, data):
-    return ('bypassed-confirmations' in config_ref and name in config_ref['bypassed-confirmations'] and config_ref['bypassed-confirmations'][name]) or ('action-confirmed' in data) 
-    
+    return ('bypassed-confirmations' in config_ref and name in config_ref['bypassed-confirmations'] and config_ref['bypassed-confirmations'][name]) or ('action-confirmed' in data)
+
 async def _confirm(update, description, data):
     delete_message = False if update.callback_query else True
     text = [ 'Por favor, confirma que realmente quieres {}'.format(description) if description is not None else '¿Estás seguro?' ]
@@ -575,7 +575,7 @@ async def _set_alarm_arm_mode(update, context, data):
                 callback_query_answer_done = True
                 await _confirm(update, 'desconectar la alarma' if arm_mode == 'disarm' else 'configurar la alarma en modo "{}"'.format(_get_alarmo_arm_mode_name(arm_mode)), data)
         else:
-            message = await update.effective_chat.send_message('"{}" no es un modo válido para la alarma'.format(arm_mode), disable_notification = True); 
+            message = await update.effective_chat.send_message('"{}" no es un modo válido para la alarma'.format(arm_mode), disable_notification = True);
     if not callback_query_answer_done:
         await callback_query_answer(update)
 
@@ -624,7 +624,7 @@ async def handle_camera_command(update, context):
         await _interact_with_a_camera(update, context, { 'action': 'interact-with-a-camera', 'camera-id': context.args[0], 'command': context.args[1] })
     else:
         await _menu(update, context, { 'action': 'cameras-menu', 'root-menu': 'cameras-menu' })
-    
+
 ##### Inicio remoto de un dispositivo
 
 async def _interact_with_a_computer(update, context, data):
@@ -648,11 +648,11 @@ async def _interact_with_a_computer(update, context, data):
             elif data['command'] == 'ping' and 'ip' in device_data:
                 message = await update.effective_chat.send_message('Espera mientras tratamos de acceder a la máquina.', disable_notification = True)
                 is_online = DeviceUtils.is_online(device_data['ip'])
-                await message.edit_text('La máquina "{}" {}'.format(device_data['name'], 'está respondiendo en la dirección "{}".'.format(device_data['ip']) if is_online else 'no parece estar conectada.')) 
+                await message.edit_text('La máquina "{}" {}'.format(device_data['name'], 'está respondiendo en la dirección "{}".'.format(device_data['ip']) if is_online else 'no parece estar conectada.'))
                 await callback_query_answer(update)
                 callback_query_answer_done = True
         if not callback_query_answer_done:
-            message = await update.effective_chat.send_message('La máquina "{}" no existe o el bot no puede interactuar con ella.'.format(data['device-id']), disable_notification = True); 
+            message = await update.effective_chat.send_message('La máquina "{}" no existe o el bot no puede interactuar con ella.'.format(data['device-id']), disable_notification = True);
     if not callback_query_answer_done:
         await callback_query_answer(update)
 
@@ -892,17 +892,17 @@ async def post_init(application):
     await application.bot.set_my_commands(commands)
     BOT_MESSAGES.clear()
 
-async def post_stop(application): 
+async def post_stop(application):
     for chat_id in BOT_MESSAGES:
         for message_id in BOT_MESSAGES[chat_id]:
             await application.bot.delete_message(chat_id, message_id)
-    
+
 if __name__ == '__main__':
     logging.basicConfig(level = config.LOG_LEVEL)
     MqttAgent.initialize()
     AlarmoUtils.initialize()
     DockerUtils.initialize()
-    if config_block_exists('EMAIL_GENERATOR'): 
+    if config_block_exists('EMAIL_GENERATOR'):
         pathname = config.EMAIL_GENERATOR['history-pathname']
         if not pathname.startswith(os.pathsep): pathname = os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir, pathname))
         EmailGenerator.initialize(pathname)
