@@ -12,6 +12,7 @@ from utils.device import DeviceUtils
 from utils.wake_on_lan import WakeOnLan
 from utils.whats_my_ip import WhatsMyIp
 from utils.email_generator import EmailGenerator
+from utils.google_maps import GoogleMapsUtils, GetLocationResultType
 
 import config
 
@@ -462,6 +463,10 @@ async def list_commands(update, context):
             '',
             '<b>/dockers</b> : Muestra el menú de dockers',
         ],
+        'location': [
+            '<u>Obtiene ubicaciones (LAT/LON) a partir de URLs de Google Maps</u>',
+            '<b>/location url</b> : Obtiene la ubicación correspondiente a la URL (la url debe ser del tipo <i>https://www.google.com/maps/</i> o <i>https:maps.app.goo.gl</i>',
+        ],
         'vpn': [
             '<u>Gestión de la VPN:</u>',
             '',
@@ -499,8 +504,11 @@ async def list_commands(update, context):
             text += "\n\n" + "\n".join(messages['computers'])
         if config_block_exists('DOCKERS'):
             text += "\n\n" + "\n".join(messages['dockers'])
+        text += "\n\n" + "\n".join(messages['location'])
         if config_block_exists('VPN'):
             text += "\n\n" + "\n".join(messages['vpn'])
+    else:
+        text += "\n\n" + "\n".join(messages['location'])
     await update.message.delete()
     await update.effective_chat.send_message(text, parse_mode = ParseMode.HTML, disable_notification = True)
 
@@ -773,6 +781,24 @@ async def handle_vpn_command(update, context):
     else:
         await _menu(update, context, { 'action': 'vpn-menu', 'root-menu': 'vpn-menu' })
 
+##### Obtener la ubicación (LAT/LON) de una URL de Google Maps
+
+async def _location(update, context, url):
+    message = await update.effective_chat.send_message('Espera un momento mientras tratamos de obtener la ubicación (LAT/LON).', disable_notification = True)
+    result_code, location = GoogleMapsUtils.get_location(url)
+    if result_code == GetLocationResultType.CANT_DECODE_URL:
+        await message.edit_text('Se ha producido un error obteniendo la ubicación:')
+    elif result_code == GetLocationResultType.UNSUPPORTED_URL_FORMAT:
+        await message.edit_text('El formato de la URL no está soportado.')
+    else:
+        await message.edit_text('La ubicación (LAT/LON) correspondiente a la URL proporcionada es "{}"'.format(location))
+    await callback_query_answer(update)
+
+async def handle_location_command(update, context):
+    await update.message.delete()
+    if len(context.args) == 1:
+        await _location(update, context, context.args[0])
+
 ##### Obtener la IP pública del router
 
 async def _whats_my_ip(update, context):
@@ -881,6 +907,7 @@ async def post_init(application):
     if config_block_exists('EMAIL_GENERATOR'):
         commands.append(BotCommand('getemail', 'genera una dirección de correo electrónico aleatoria.'))
     commands.append(BotCommand('menu', 'muestra el menú del bot.'))
+    commands.append(BotCommand('location', 'obtiene la ubicación (LAT/LON) correspondiente a un link de Google Maps.'))
     if config_block_exists('COMPUTERS'):
         commands.append(BotCommand('ping', 'comprueba si una máquina está conectada.'))
     commands.append(BotCommand('uptime', 'muestra el tiempo que hace desde el último reinicio.'))
@@ -917,6 +944,7 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler('computers', computers_menu))
     application.add_handler(CommandHandler('computer', handle_computer_command))
     application.add_handler(CommandHandler('dockers', dockers_menu))
+    application.add_handler(CommandHandler('location', handle_location_command))
     application.add_handler(CommandHandler('ping', handle_ping_command))
     application.add_handler(CommandHandler('vpn', handle_vpn_command))
     application.add_handler(CommandHandler('wakeonlan', handle_wakeonlan_command))
