@@ -49,7 +49,7 @@ class MqttAgent():
 
     @staticmethod
     def initialize():
-        MqttAgent.DATA['client'] = mqtt.Client()
+        MqttAgent.DATA['client'] = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
         MqttAgent.DATA['client'].enable_logger(logging.getLogger(__name__))
         MqttAgent.DATA['client'].username_pw_set(config.MQTT['broker']['username'], config.MQTT['broker']['password'])
         MqttAgent.DATA['client'].on_connect = MqttAgent._on_connect
