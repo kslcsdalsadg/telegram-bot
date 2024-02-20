@@ -40,7 +40,7 @@ class MqttAgent():
         logging.info('No se ha podido conectar con el servicio mqtt tras %d intentos...', reconnect_attempt)
 
     @staticmethod
-    def _on_connect(mqtt_client, userdata, flags, result_code):
+    def _on_connect(mqtt_client, userdata, flags, result_code, propierties):
         if result_code != 0:
             logging.getLogger(__name__).error('No se ha podido conectar con mqtt (códido de error %s)', result_code)
         else:
@@ -49,7 +49,7 @@ class MqttAgent():
 
     @staticmethod
     def initialize():
-        MqttAgent.DATA['client'] = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
+        MqttAgent.DATA['client'] = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         MqttAgent.DATA['client'].enable_logger(logging.getLogger(__name__))
         MqttAgent.DATA['client'].username_pw_set(config.MQTT['broker']['username'], config.MQTT['broker']['password'])
         MqttAgent.DATA['client'].on_connect = MqttAgent._on_connect
@@ -91,3 +91,4 @@ class MqttAgent():
     @staticmethod
     def get_last_message(topic):
         return MqttAgent.DATA['subscribed-topics'][topic]['last-message'] if MqttAgent.is_connected() and topic in MqttAgent.DATA['subscribed-topics'] else None
+        
