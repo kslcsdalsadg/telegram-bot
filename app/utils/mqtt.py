@@ -8,29 +8,52 @@ logger = logging.getLogger(__name__)
 
 class MqttAgent():
     DATA = { 'client': None, 'connected': False , 'subscribed-topics': {} }
+    CONFIG = { 'callback_version': mqtt.CallbackAPIVersion.VERSION2 }
 
     @staticmethod
-    def _subscribe_topics(mqtt_client):
+    def _subscribe_topics(client):
         for topic in MqttAgent.DATA['subscribed-topics']:
-            mqtt_client.subscribe(topic)
+            client.subscribe(topic)
 
     @staticmethod
-    def _on_message(mqtt_client, userdata, message):
+    def _on_message(client, userdata, message):
+        """
+        Callback signature doesn't depends on API version:
+
+            _on_message(client, userdata, message)
+
+        """
         if message.topic in MqttAgent.DATA['subscribed-topics']:
             MqttAgent.DATA['subscribed-topics'][message.topic]['last-message'] = message.payload.decode('utf-8')
             for callback in MqttAgent.DATA['subscribed-topics'][message.topic]['callbacks']:
                 callback(MqttAgent.DATA['subscribed-topics'][message.topic]['last-message'])
 
     @staticmethod
-    def _on_disconnect(mqtt_client, userdata, result_code):
+    def _on_disconnect(client, userdata, p1 = None, p2 = None, p3 = None):
+        """
+        Callback signatures:
+
+        API version 2:
+            _on_disconnect(client, userdata, flags, reason_code, properties)
+
+        API version 1:
+          For MQTT v3.1 and v3.1.1 it's::
+              _on_disconnect(client, userdata, reason_code)
+
+          For MQTT it's v5.0::
+              _on_disconnect(client, userdata, reason_code, properties)
+        """
+        if MqttAgent.CONFIG['callback_version'] == mqtt.CallbackAPIVersion.VERSION2: flags = p1
+        reason_code = p2 if MqttAgent.CONFIG['callback_version'] == mqtt.CallbackAPIVersion.VERSION2 else p1
+        propierties = p3 if MqttAgent.CONFIG['callback_version'] == mqtt.CallbackAPIVersion.VERSION2 else p2
         MqttAgent.DATA['connected'] = False
-        logging.info('Se ha desconectado del servicio mqtt (códido de error: %)', result_code)
+        logging.info('Se ha desconectado del servicio mqtt (códido de error: %)', reason_code)
         reconnect_attempt, reconnect_delay = 0, config.MQTT['first-reconnect-delay']
         while reconnect_attempt < config.MQTT['max-reconnect-attempts']:
             logging.info('Esperando %d segundos antes de intentar de reconectar con el servicio mqtt', reconnect_delay)
             sleep(reconnect_delay)
             try:
-                mqtt_client.reconnect()
+                client.reconnect()
                 logging.info("Se ha establecido la conexión con el servicio mqtt")
                 return
             except:
@@ -40,16 +63,30 @@ class MqttAgent():
         logging.info('No se ha podido conectar con el servicio mqtt tras %d intentos...', reconnect_attempt)
 
     @staticmethod
-    def _on_connect(mqtt_client, userdata, flags, result_code, propierties):
-        if result_code != 0:
-            logging.getLogger(__name__).error('No se ha podido conectar con mqtt (códido de error %s)', result_code)
+    def _on_connect(client, userdata, flags, reason_code, propierties = None):
+        """
+        Callback signatures:
+
+        API version 2::
+            _on_connect(client, userdata, flags, reason_code, properties)
+
+        API version 1:
+          For MQTT v3.1 and v3.1.1 it's::
+            _on_connect(client, userdata, flags, reason_code)
+
+          For MQTT it's v5.0::
+            _on_connect(client, userdata, flags, reason_code, properties)
+        """
+
+        if reason_code != 0:
+            logging.getLogger(__name__).error('No se ha podido conectar con mqtt (códido de error %s)', reason_code)
         else:
             MqttAgent.DATA['connected'] = True
-            MqttAgent._subscribe_topics(mqtt_client)
+            MqttAgent._subscribe_topics(client)
 
     @staticmethod
     def initialize():
-        MqttAgent.DATA['client'] = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+        MqttAgent.DATA['client'] = mqtt.Client(MqttAgent.CONFIG['callback_version'])
         MqttAgent.DATA['client'].enable_logger(logging.getLogger(__name__))
         MqttAgent.DATA['client'].username_pw_set(config.MQTT['broker']['username'], config.MQTT['broker']['password'])
         MqttAgent.DATA['client'].on_connect = MqttAgent._on_connect
@@ -91,4 +128,4 @@ class MqttAgent():
     @staticmethod
     def get_last_message(topic):
         return MqttAgent.DATA['subscribed-topics'][topic]['last-message'] if MqttAgent.is_connected() and topic in MqttAgent.DATA['subscribed-topics'] else None
-        
+
