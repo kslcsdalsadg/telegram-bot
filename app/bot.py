@@ -791,7 +791,7 @@ async def _location(update, context, url):
     elif result_code == GetLocationResultType.UNSUPPORTED_URL_FORMAT:
         await message.edit_text('El formato de la URL no está soportado.')
     else:
-        await message.edit_text('La ubicación (LAT/LON) correspondiente a la URL proporcionada es "{}"'.format(location))
+        await message.edit_text(location)
     await callback_query_answer(update)
 
 async def handle_location_command(update, context):
