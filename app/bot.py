@@ -791,7 +791,8 @@ async def _location(update, context, url):
     elif result_code == GetLocationResultType.UNSUPPORTED_URL_FORMAT:
         await message.edit_text('El formato de la URL no está soportado.')
     else:
-        await message.edit_text(location)
+        await message.edit_text('A continuación se muestra la ubicación (LAT/LON) correspondiente de la URL indicada: {}'.format(url))
+        await update.effective_chat.send_message(location, disable_notification = True)    
     await callback_query_answer(update)
 
 async def handle_location_command(update, context):
