@@ -17,6 +17,11 @@ class GoogleMapsUtils():
                 return GetLocationResultType.CANT_DECODE_URL, None
             else:
                 url = stdout.decode()
+        if url.startswith('https://www.google.com/maps/dir//'):
+            match = re.search("\/dir\/\/[^,]+,[^\/]+/", url)
+            if match is not None:
+                location = match.group(0)
+                return GetLocationResultType.NO_ERROR, location[6:len(location) - 1]
         if url.startswith('https://www.google.com/maps/'):
             match = re.search("@[^,]+,[^,]+,", url)
             if match is not None:
