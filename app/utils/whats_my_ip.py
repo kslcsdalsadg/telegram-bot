@@ -1,12 +1,12 @@
 import requests
 
 class WhatsMyIp():
-    URL = 'https://api.ipify.org/?format=json'
+    URL = 'https://ipv4.icanhazip.com'
 
     @staticmethod
     def get():
         result = requests.get(WhatsMyIp.URL)
-        return result.json()['ip'] if result.status_code == 200 else None
+        return result.content.decode('utf-8').strip() if result.status_code == 200 else None
 
 
 
