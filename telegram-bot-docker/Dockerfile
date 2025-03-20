@@ -21,7 +21,7 @@ RUN apt install -y wakeonlan
 
 RUN git clone https://github.com/JurajNyiri/pytapo.git /tmp/pytapo
 RUN mv /tmp/pytapo/pytapo /app
-RUN pip install certifi==2022.5.18.1 charset-normalizer==2.0.12 idna==3.3 pycryptodome==3.14.1 requests==2.27.1 rtp==0.0.3 urllib3==1.26.9
+RUN pip install certifi==2022.5.18.1 charset-normalizer==2.0.12 idna==3.3 pycryptodome==3.14.1 requests==2.27.1 rtp==0.0.3 urllib3==1.26.9 python-kasa
 RUN apt install -y iputils-ping
 
 ENTRYPOINT [ "python", "/app/bot.py" ]
